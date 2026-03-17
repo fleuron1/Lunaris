@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/goodn/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/e229989f-3cd6-47e1-851d-6206e670c0ad/bd93371e-4e93-410c-8d34-24673d334add/skills/docx/**)",
+      "Bash(pandoc --track-changes=all \"C:\\\\Users\\\\goodn\\\\Downloads\\\\files\\\\dynamic_sheet_project_plan.docx\" -o output.md)",
+      "Bash(python \"C:\\\\Users\\\\goodn\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\e229989f-3cd6-47e1-851d-6206e670c0ad\\\\bd93371e-4e93-410c-8d34-24673d334add\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\goodn\\\\Downloads\\\\files\\\\dynamic_sheet_project_plan.docx\" \"C:\\\\Users\\\\goodn\\\\Downloads\\\\files\\\\unpacked_docx\")",
+      "Bash(python3 \"C:\\\\Users\\\\goodn\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\e229989f-3cd6-47e1-851d-6206e670c0ad\\\\bd93371e-4e93-410c-8d34-24673d334add\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\goodn\\\\Downloads\\\\files\\\\dynamic_sheet_project_plan.docx\" /tmp/unpacked_docx)",
+      "Read(//tmp/unpacked_docx/word/**)",
+      "Bash(/c/Users/goodn/AppData/Local/Programs/Python/Python312/python.exe \"C:\\\\Users\\\\goodn\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\e229989f-3cd6-47e1-851d-6206e670c0ad\\\\bd93371e-4e93-410c-8d34-24673d334add\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\goodn\\\\Downloads\\\\files\\\\dynamic_sheet_project_plan.docx\" /tmp/unpacked_docx)",
+      "Bash(/c/Users/goodn/AppData/Local/Programs/Python/Python312/python.exe -m pip install defusedxml -q)"
+    ]
+  }
+}

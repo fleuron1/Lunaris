@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-slate-100 min-h-screen;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background-color: #07091a;
+    background-image:
+      radial-gradient(ellipse at 68% -5%, rgba(88, 28, 220, 0.32) 0%, transparent 52%),
+      radial-gradient(ellipse at 12% 98%, rgba(49, 10, 100, 0.22) 0%, transparent 42%);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.25);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.45);
+  }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.08; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@layer utilities {
+  .pip {
+    @apply w-5 h-5 rounded-full border-2 cursor-pointer transition-all duration-200;
+  }
+  .pip-empty {
+    @apply border-violet-800/50 bg-transparent hover:border-violet-400/60 hover:bg-violet-500/10;
+  }
+  .pip-filled {
+    @apply border-violet-400 bg-violet-500 shadow-[0_0_8px_rgba(167,139,250,0.55)];
+  }
+  .stat-box {
+    @apply bg-[#0c1030]/90 rounded-xl p-3 text-center border border-violet-900/30
+           hover:border-violet-600/30 transition-colors duration-200;
+  }
+  .card {
+    @apply bg-[#0c1030]/90 rounded-xl border border-violet-900/30
+           shadow-[0_4px_24px_rgba(88,28,220,0.08)];
+  }
+  .section-header {
+    @apply text-[10px] font-bold uppercase tracking-[0.14em] text-violet-300/55 mb-2;
+  }
+  .btn-primary {
+    @apply bg-violet-700 hover:bg-violet-600 text-white font-semibold py-1.5 px-4
+           rounded-lg text-sm transition-all duration-150
+           shadow-[0_0_12px_rgba(139,92,246,0.2)] hover:shadow-[0_0_16px_rgba(139,92,246,0.35)];
+  }
+  .btn-secondary {
+    @apply bg-[#12163a] hover:bg-[#1a1f4a] text-slate-200 font-semibold py-1.5 px-4
+           rounded-lg text-sm transition-all duration-150
+           border border-violet-900/35 hover:border-violet-600/35;
+  }
+  .btn-danger {
+    @apply bg-red-900/60 hover:bg-red-800/70 text-white font-semibold py-1.5 px-4
+           rounded-lg text-sm transition-all duration-150
+           border border-red-800/40;
+  }
+  .input-field {
+    @apply bg-[#0c1030] border border-violet-900/40 rounded-lg px-3 py-1.5 text-sm
+           text-slate-100 focus:outline-none focus:border-violet-500/50
+           placeholder-slate-600 transition-colors;
+  }
+  .btn-sm {
+    @apply w-7 h-7 flex items-center justify-center rounded-lg
+           bg-[#12163a] hover:bg-violet-800/30 text-slate-300 font-bold text-sm
+           transition-all duration-150 border border-violet-900/30
+           hover:border-violet-500/30 select-none;
+  }
+}
+
+/* Decorative star prefix on section headers */
+.section-header::before {
+  content: '✦ ';
+  color: rgba(167, 139, 250, 0.45);
+}
