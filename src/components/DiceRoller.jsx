@@ -315,7 +315,9 @@ export function DiceRollerProvider({ children }) {
   useEffect(() => {
     const el = document.createElement('div')
     el.id = 'dice-box-host'
-    el.style.cssText = 'position:fixed;inset:0;z-index:102;pointer-events:none;'
+    // Oversized canvas so the physics world is large enough for big dice (scale 50).
+    // Centred on the viewport: extends 100vw/vh beyond each edge → 3× the viewport.
+    el.style.cssText = 'position:fixed;left:-100vw;top:-100vh;width:300vw;height:300vh;z-index:102;pointer-events:none;'
     document.body.appendChild(el)
 
     let box = null
@@ -324,7 +326,7 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        scale:            16,
+        scale:            50,
         gravity:          1,
         mass:             1,
         friction:         0.8,
