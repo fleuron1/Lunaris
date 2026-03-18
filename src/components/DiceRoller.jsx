@@ -30,6 +30,18 @@ const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
     .dice-pop        { animation: dicePop      0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
     .dice-pop-total  { animation: dicePopTotal 0.5s  cubic-bezier(0.34,1.56,0.64,1) both; }
     .dice-crit-flash { animation: critFlash 0.35s ease-in-out 4; }
+
+    /* Critical: style both container AND canvas — from official dice-box CSS */
+    #dice-box-host,
+    #dice-box-host canvas {
+      position: fixed !important;
+      pointer-events: none;
+      z-index: 102;
+      width: 100% !important;
+      height: 100% !important;
+      top: 0;
+      left: 0;
+    }
   `
   document.head.appendChild(s)
 })()
