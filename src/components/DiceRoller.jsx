@@ -343,7 +343,7 @@ export function DiceRollerProvider({ children }) {
         throwForce:       5,
         startingHeight:   12,
         settleTimeout:    5000,
-        offscreen:        true,
+        offscreen:        false,
         delay:            10,
         enableShadows:    true,
         lightIntensity:   1,
