@@ -319,9 +319,10 @@ export function DiceRollerProvider({ children }) {
   useEffect(() => {
     const el = document.createElement('div')
     el.id = 'dice-box-host'
-    // Oversized canvas so the physics world is large enough for big dice (scale 50).
-    // Centred on the viewport: extends 100vw/vh beyond each edge → 3× the viewport.
-    el.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:102;pointer-events:none;'
+    // Size the canvas to exact screen pixels so the physics world matches the viewport.
+    const W = window.innerWidth
+    const H = window.innerHeight
+    el.style.cssText = `position:fixed;inset:0;width:${W}px;height:${H}px;z-index:102;pointer-events:none;`
     document.body.appendChild(el)
 
     let box = null
@@ -333,12 +334,12 @@ export function DiceRollerProvider({ children }) {
         scale:            50,
         gravity:          2,
         mass:             1,
-        friction:         0.9,
-        restitution:      0.05,
-        angularDamping:   0.5,
-        linearDamping:    0.5,
-        spinForce:        4,
-        throwForce:       4,
+        friction:         0.8,
+        restitution:      0.1,
+        angularDamping:   0.4,
+        linearDamping:    0.4,
+        spinForce:        6,
+        throwForce:       6,
         startingHeight:   8,
         settleTimeout:    4000,
         offscreen:        true,
@@ -355,7 +356,15 @@ export function DiceRollerProvider({ children }) {
       el.remove()
     }
 
+    // Keep the canvas in sync if the user resizes the window
+    function onResize() {
+      el.style.width  = window.innerWidth  + 'px'
+      el.style.height = window.innerHeight + 'px'
+    }
+    window.addEventListener('resize', onResize)
+
     return () => {
+      window.removeEventListener('resize', onResize)
       box?.clear?.()
       el.remove()
     }
