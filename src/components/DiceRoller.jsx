@@ -268,32 +268,39 @@ export function DiceRollerProvider({ children }) {
     el.style.cssText = 'position:fixed;inset:0;z-index:102;pointer-events:none;'
     document.body.appendChild(el)
 
-    const box = new DiceBox(el, {
-      assetPath:        ASSET_PATH,
-      id:               'dice-canvas',
-      scale:            7,
-      gravity:          1,
-      mass:             1,
-      friction:         0.8,
-      restitution:      0,
-      angularDamping:   0.4,
-      linearDamping:    0.4,
-      spinForce:        4,
-      throwForce:       5,
-      startingHeight:   8,
-      settleTimeout:    5000,
-      offscreen:        true,
-      delay:            10,
-      enableShadows:    true,
-      lightIntensity:   1,
-    })
+    let box = null
+    try {
+      box = new DiceBox({
+        assetPath:        ASSET_PATH,
+        container:        el,
+        id:               'dice-canvas',
+        scale:            7,
+        gravity:          1,
+        mass:             1,
+        friction:         0.8,
+        restitution:      0,
+        angularDamping:   0.4,
+        linearDamping:    0.4,
+        spinForce:        4,
+        throwForce:       5,
+        startingHeight:   8,
+        settleTimeout:    5000,
+        offscreen:        true,
+        delay:            10,
+        enableShadows:    true,
+        lightIntensity:   1,
+      })
 
-    box.init()
-      .then(() => { diceBoxRef.current = box; setBoxReady(true) })
-      .catch(err => console.error('[DiceBox] init error:', err))
+      box.init()
+        .then(() => { diceBoxRef.current = box; setBoxReady(true) })
+        .catch(err => console.warn('[DiceBox] init failed (dice rolling unavailable):', err))
+    } catch (err) {
+      console.warn('[DiceBox] constructor failed (dice rolling unavailable):', err)
+      el.remove()
+    }
 
     return () => {
-      box.clear?.()
+      box?.clear?.()
       el.remove()
     }
   }, [])
