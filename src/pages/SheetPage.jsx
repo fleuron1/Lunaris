@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDiceRoller } from '../components/DiceRoller.jsx'
 import AbilityBlock from '../components/AbilityBlock.jsx'
 import SkillsList from '../components/SkillsList.jsx'
 import HPTracker from '../components/HPTracker.jsx'
@@ -42,6 +43,7 @@ export default function SheetPage({
   spellSaveDC, spellAttackBonus, chosenMetamagic,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
+  const { roll } = useDiceRoller()
 
   function handleLongRest() {
     if (showLongRestConfirm) {
@@ -248,7 +250,14 @@ export default function SheetPage({
                     <tr key={w.id} className="border-b border-violet-900/20 hover:bg-violet-900/10 transition-colors">
                       <td className="py-2.5 font-medium text-slate-200">{w.name}</td>
                       <td className="py-2.5 text-center font-mono font-bold text-amber-300">{w.atkBonus}</td>
-                      <td className="py-2.5 text-slate-300">{w.damage}</td>
+                      <td
+                        className="py-2.5 text-violet-300/80 cursor-pointer hover:text-violet-200 group transition-colors"
+                        onClick={() => roll(w.name, w.damage, 'violet')}
+                        title="Click to roll damage"
+                      >
+                        <span className="group-hover:underline underline-offset-2">{w.damage}</span>
+                        <span className="ml-1.5 text-violet-500/40 group-hover:text-violet-400/70 text-[11px] transition-colors">🎲</span>
+                      </td>
                       <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell">{w.notes}</td>
                     </tr>
                   ))}

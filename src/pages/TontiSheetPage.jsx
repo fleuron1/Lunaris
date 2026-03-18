@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ABILITIES, SKILLS, CLASS_FEATURES, SPECIES_TRAITS, SAVE_PROFS, PROFICIENCIES } from '../data/tonti.js'
+import { useDiceRoller } from '../components/DiceRoller.jsx'
 
 function mod(score) { return Math.floor((score - 10) / 2) }
 function fmtMod(n) { return n >= 0 ? `+${n}` : `${n}` }
@@ -450,6 +451,8 @@ function SpeciesTraitsSection({ felineAgilityUsed, toggleFelineAgility }) {
 // ── Weapons ───────────────────────────────────────────────────────────────────
 
 function WeaponsSection({ weapons }) {
+  const { roll } = useDiceRoller()
+
   return (
     <Card className="p-4">
       <SH>Weapons & Attacks</SH>
@@ -468,7 +471,14 @@ function WeaponsSection({ weapons }) {
               <tr key={w.id} className="border-b border-pink-950/30 hover:bg-pink-950/10 transition-colors">
                 <td className="py-2.5 font-medium text-slate-200">{w.name}</td>
                 <td className="py-2.5 text-center font-mono font-bold text-pink-300">{w.atkBonus}</td>
-                <td className="py-2.5 text-slate-300">{w.damage}</td>
+                <td
+                  className="py-2.5 text-pink-300/80 cursor-pointer hover:text-pink-200 group transition-colors"
+                  onClick={() => roll(w.name, w.damage, 'pink')}
+                  title="Click to roll damage"
+                >
+                  <span className="group-hover:underline underline-offset-2">{w.damage}</span>
+                  <span className="ml-1.5 text-pink-500/40 group-hover:text-pink-400/70 text-[11px] transition-colors">🎲</span>
+                </td>
                 <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell">{w.notes}</td>
               </tr>
             ))}
