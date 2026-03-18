@@ -291,6 +291,7 @@ function FighterApp() {
   return (
     <>
       <SnowField />
+      <div className="relative z-10">
       <FighterNavBar
         characterId={characterId}
         characterName={state.characterName}
@@ -339,6 +340,7 @@ function FighterApp() {
           />
         </Routes>
       </main>
+      </div>
     </>
   )
 }
