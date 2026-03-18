@@ -93,6 +93,8 @@ export default function App() {
                   knownCantrips={charState.knownCantrips}
                   spellSaveDC={charState.spellSaveDC}
                   spellAttackBonus={charState.spellAttackBonus}
+                  spellSlots={charState.spellSlots}
+                  castSpell={charState.castSpell}
                 />
               }
             />

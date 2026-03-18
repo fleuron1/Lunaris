@@ -150,6 +150,17 @@ export function useCharacterState() {
     }))
   }
 
+  function castSpell(level) {
+    if (!level || level === 'C') return
+    setState(prev => {
+      const slots = { ...prev.spellSlots }
+      const slot = { ...slots[level] }
+      if (!slot || slot.expended >= slot.total) return prev
+      slots[level] = { ...slot, expended: slot.expended + 1 }
+      return { ...prev, spellSlots: slots }
+    })
+  }
+
   function shortRest() {}
 
   function longRest() {
@@ -289,7 +300,7 @@ export function useCharacterState() {
     ...state,
     // Combat actions
     adjustHp, setTempHp, toggleDeathSave, resetDeathSaves,
-    toggleSpellSlot, adjustSorceryPoints,
+    toggleSpellSlot, castSpell, adjustSorceryPoints,
     setLunarPhase, toggleInspiration,
     setConcentration, adjustHitDice,
     shortRest, longRest,

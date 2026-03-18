@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { SPELLS as LUNAR_SPELLS, COMBAT, LUNAR_PHASES } from '../data/annabelle.js'
 import sorcererSpells from '../data/sorcerer-spells.json'
 
@@ -21,11 +22,13 @@ function adaptSpell(s) {
   return {
     name: s.name,
     level: s.level === 0 ? 'C' : s.level,
+    school: s.school,
     castTime: s.castTime,
     range: s.range,
     conc: s.concentration,
     ritual: s.ritual,
     mat: s.material,
+    source: s.source,
     notes: s.description,
   }
 }
@@ -36,17 +39,165 @@ const ALL_SPELLS = [
   ...sorcererSpells.filter(s => !LUNAR_NAMES.has(s.name)).map(adaptSpell),
 ]
 
-function SpellCard({ spell, concentration, setConcentration, lunarPhase }) {
+// ── Spell Detail Modal ────────────────────────────────────────────────────────
+
+function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
+  const isCantrip = spell.level === 'C'
   const isLunar = !!spell.lunar
   const isActivePhase = spell.lunar === lunarPhase
-  const isConc = concentration === spell.name
+  const slotData = !isCantrip ? spellSlots?.[spell.level] : null
+  const slotsLeft = slotData ? slotData.total - slotData.expended : 0
+  const noSlots = !isCantrip && slotsLeft <= 0
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  function handleCast() {
+    if (isCantrip || noSlots) return
+    castSpell(spell.level)
+    onClose()
+  }
 
   return (
     <div
-      className={`rounded-xl border p-3 transition-all duration-200 ${
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <div
+        className={`relative w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${
+          isLunar && isActivePhase
+            ? PHASE_STYLES[spell.lunar] + ' border-opacity-60'
+            : 'bg-[#0f0a1e] border-violet-800/40'
+        }`}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={`px-5 pt-5 pb-4 border-b ${isLunar && isActivePhase ? 'border-current/20' : 'border-violet-800/30'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+                {spell.name}
+              </h2>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs text-violet-300/60">
+                  {isCantrip ? 'Cantrip' : `${LEVEL_LABELS[spell.level]} spell`}
+                  {spell.school ? ` · ${spell.school}` : ''}
+                </span>
+                {spell.source && (
+                  <span className="text-[10px] bg-violet-950/50 border border-violet-800/30 text-violet-400/50 px-1.5 py-0.5 rounded-full">
+                    {spell.source}
+                  </span>
+                )}
+                {isLunar && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${
+                    isActivePhase ? PHASE_STYLES[spell.lunar] : 'bg-violet-950/40 border-violet-900/30 text-violet-400/50'
+                  }`}>
+                    {PHASE_ICONS[spell.lunar]} Lunar Bonus
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-violet-400/50 hover:text-violet-200 transition-colors text-xl leading-none mt-0.5 flex-shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="flex gap-4 px-5 py-3 border-b border-violet-800/20 text-xs">
+          <div>
+            <span className="text-violet-400/50 uppercase tracking-wider">Cast Time </span>
+            <span className="text-slate-200 font-medium">{spell.castTime}</span>
+          </div>
+          <div>
+            <span className="text-violet-400/50 uppercase tracking-wider">Range </span>
+            <span className="text-slate-200 font-medium">{spell.range}</span>
+          </div>
+          <div className="flex gap-1.5 ml-auto items-center">
+            {spell.conc && (
+              <span className="bg-amber-900/30 border border-amber-700/40 text-amber-300 px-2 py-0.5 rounded-full">Concentration</span>
+            )}
+            {spell.ritual && (
+              <span className="bg-violet-950/40 border border-violet-800/40 text-violet-400/70 px-2 py-0.5 rounded-full">Ritual</span>
+            )}
+            {spell.mat && (
+              <span className="bg-violet-950/40 border border-violet-800/40 text-violet-400/70 px-2 py-0.5 rounded-full">Material</span>
+            )}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="px-5 py-4 max-h-64 overflow-y-auto">
+          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{spell.notes}</p>
+        </div>
+
+        {/* Footer — cast button */}
+        {!isCantrip && (
+          <div className={`px-5 py-4 border-t border-violet-800/20 flex items-center justify-between gap-3`}>
+            <div className="text-xs text-violet-300/50">
+              {slotData
+                ? <span>{slotsLeft} / {slotData.total} slots remaining</span>
+                : <span>No slots at this level</span>
+              }
+            </div>
+            <button
+              onClick={handleCast}
+              disabled={noSlots}
+              className={`px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 ${
+                noSlots
+                  ? 'bg-violet-950/40 border border-violet-800/30 text-violet-500/40 cursor-not-allowed'
+                  : 'bg-violet-700/60 border border-violet-500/50 text-white hover:bg-violet-600/70 hover:border-violet-400/60 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
+              }`}
+            >
+              {noSlots ? 'No Slots Left' : `Cast (uses lvl ${spell.level} slot)`}
+            </button>
+          </div>
+        )}
+        {isCantrip && (
+          <div className="px-5 py-3 border-t border-violet-800/20 flex justify-end">
+            <span className="text-xs text-violet-400/40 italic">Cantrips don't use spell slots</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Spell Card ────────────────────────────────────────────────────────────────
+
+function SpellCard({ spell, concentration, setConcentration, lunarPhase, onOpen, spellSlots, castSpell }) {
+  const isLunar = !!spell.lunar
+  const isActivePhase = spell.lunar === lunarPhase
+  const isConc = concentration === spell.name
+  const isCantrip = spell.level === 'C'
+  const slotData = !isCantrip ? spellSlots?.[spell.level] : null
+  const slotsLeft = slotData ? slotData.total - slotData.expended : 0
+  const noSlots = !isCantrip && slotsLeft <= 0
+
+  function handleCast(e) {
+    e.stopPropagation()
+    if (isCantrip || noSlots) return
+    castSpell(spell.level)
+  }
+
+  return (
+    <div
+      onClick={() => onOpen(spell)}
+      className={`rounded-xl border p-3 transition-all duration-200 cursor-pointer ${
         isLunar && isActivePhase
           ? PHASE_STYLES[spell.lunar]
-          : 'bg-violet-950/20 border-violet-900/25 hover:border-violet-700/30'
+          : 'bg-violet-950/20 border-violet-900/25 hover:border-violet-600/50 hover:bg-violet-950/30'
       } ${isConc ? 'ring-1 ring-amber-400/50 shadow-[0_0_10px_rgba(251,191,36,0.1)]' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -78,27 +229,49 @@ function SpellCard({ spell, concentration, setConcentration, lunarPhase }) {
             <span>{spell.range}</span>
           </div>
           {spell.notes && (
-            <p className="text-xs text-slate-400/70 mt-1 leading-snug line-clamp-3">{spell.notes}</p>
+            <p className="text-xs text-slate-400/70 mt-1 leading-snug line-clamp-2">{spell.notes}</p>
           )}
         </div>
-        {spell.conc && (
-          <button
-            onClick={() => setConcentration(isConc ? null : spell.name)}
-            className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 transition-all duration-150 ${
-              isConc
-                ? 'bg-amber-600/80 text-white shadow-[0_0_8px_rgba(251,191,36,0.3)]'
-                : 'bg-violet-950/50 border border-violet-800/40 text-violet-300/50 hover:border-violet-500/50 hover:text-violet-200'
-            }`}
-          >
-            {isConc ? 'Conc. ✓' : 'Conc.'}
-          </button>
-        )}
+
+        {/* Right-side buttons */}
+        <div className="flex flex-col gap-1 flex-shrink-0 items-end">
+          {spell.conc && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setConcentration(isConc ? null : spell.name) }}
+              className={`text-xs px-2.5 py-1 rounded-full font-semibold transition-all duration-150 ${
+                isConc
+                  ? 'bg-amber-600/80 text-white shadow-[0_0_8px_rgba(251,191,36,0.3)]'
+                  : 'bg-violet-950/50 border border-violet-800/40 text-violet-300/50 hover:border-violet-500/50 hover:text-violet-200'
+              }`}
+            >
+              {isConc ? 'Conc. ✓' : 'Conc.'}
+            </button>
+          )}
+          {!isCantrip && (
+            <button
+              onClick={handleCast}
+              disabled={noSlots}
+              className={`text-xs px-2.5 py-1 rounded-full font-semibold transition-all duration-150 ${
+                noSlots
+                  ? 'bg-violet-950/30 border border-violet-900/20 text-violet-600/30 cursor-not-allowed'
+                  : 'bg-violet-800/40 border border-violet-600/40 text-violet-200 hover:bg-violet-700/50 hover:border-violet-500/60'
+              }`}
+              title={noSlots ? 'No spell slots remaining' : `Cast (uses 1 level ${spell.level} slot)`}
+            >
+              {noSlots ? '✕ Cast' : '⚡ Cast'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips }) {
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell }) {
+  const [selectedSpell, setSelectedSpell] = useState(null)
+
   const grouped = {}
   ALL_SPELLS.forEach(spell => {
     const isCantrip = spell.level === 'C'
@@ -118,6 +291,17 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
 
   return (
     <div className="max-w-[1380px] mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4">
+
+      {/* Spell detail modal */}
+      {selectedSpell && (
+        <SpellModal
+          spell={selectedSpell}
+          onClose={() => setSelectedSpell(null)}
+          spellSlots={spellSlots}
+          castSpell={castSpell}
+          lunarPhase={lunarPhase}
+        />
+      )}
 
       {/* Header */}
       <div className="card p-4 sm:p-5">
@@ -157,6 +341,27 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
         </div>
       </div>
 
+      {/* Slot tracker summary */}
+      {spellSlots && (
+        <div className="flex flex-wrap gap-2">
+          {[1,2,3,4,5,6,7,8,9].map(lvl => {
+            const slot = spellSlots[lvl]
+            if (!slot || slot.total === 0) return null
+            const left = slot.total - slot.expended
+            return (
+              <div key={lvl} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${
+                left === 0
+                  ? 'bg-violet-950/20 border-violet-900/20 text-violet-600/40'
+                  : 'bg-violet-950/30 border-violet-800/40 text-violet-300'
+              }`}>
+                <span className="text-violet-400/50">Lvl {lvl}</span>
+                <span className={left === 0 ? 'text-violet-600/40' : 'text-amber-300 font-bold'}>{left}/{slot.total}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Phase legend */}
       <div className="flex flex-wrap gap-2">
         {Object.entries(LUNAR_PHASES).map(([key, p]) => (
@@ -191,6 +396,9 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
                   concentration={concentration}
                   setConcentration={setConcentration}
                   lunarPhase={lunarPhase}
+                  onOpen={setSelectedSpell}
+                  spellSlots={spellSlots}
+                  castSpell={castSpell}
                 />
               ))}
             </div>
