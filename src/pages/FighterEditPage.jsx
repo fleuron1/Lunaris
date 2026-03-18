@@ -435,77 +435,86 @@ function SkillsTab({ abilityScores, profBonus, skillProfs, setSkillProf, languag
 
 // ── Feats Tab ─────────────────────────────────────────────────────────────────
 
+const FEAT_CAT = { G: 'General', O: 'Origin', FS: 'Fighting Style', EF: 'Epic Boon' }
+
 function FeatsTab({ feats = [], toggleFeat }) {
-  const [query, setQuery] = useState('')
+  const [search,     setSearch]     = useState('')
+  const [showChosen, setShowChosen] = useState(false)
 
-  const results = useMemo(() => {
-    if (!query.trim()) return []
-    const q = query.toLowerCase()
-    return featsData.filter(f =>
-      f.name.toLowerCase().includes(q) && !feats.includes(f.name)
-    ).slice(0, 8)
-  }, [query, feats])
-
-  const chosenFeats = useMemo(() =>
-    featsData.filter(f => feats?.includes(f.name)),
-  [feats])
+  const filtered = useMemo(() => featsData.filter(f => {
+    if (showChosen && !feats.includes(f.name)) return false
+    if (search && !f.name.toLowerCase().includes(search.toLowerCase()) &&
+        !f.description?.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  }), [search, showChosen, feats])
 
   return (
     <div className="space-y-4">
-      <Card className="p-5">
-        <SH>Add Feat</SH>
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search feats…"
-          className="w-full bg-[#030b18] border border-pink-950/40 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-pink-700/50 placeholder-slate-700 mb-3"
-        />
-        {results.length > 0 && (
-          <ul className="space-y-1">
-            {results.map(f => (
-              <li key={f.name}>
-                <button
-                  onClick={() => { toggleFeat(f.name); setQuery('') }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-pink-950/30 transition-colors group"
-                >
-                  <span className="text-sm text-slate-200 group-hover:text-white">{f.name}</span>
-                  {f.prerequisite && (
-                    <span className="ml-2 text-[10px] text-pink-300/40">{f.prerequisite}</span>
-                  )}
-                  <span className="ml-auto float-right text-[10px] text-pink-700/50 group-hover:text-pink-400/70">+ add</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {query.trim() && results.length === 0 && (
-          <p className="text-xs text-pink-300/30 text-center py-2">No matching feats</p>
-        )}
-      </Card>
-
-      {chosenFeats.length > 0 && (
+      {feats.length > 0 && (
         <Card className="p-5">
-          <SH>Known Feats</SH>
-          <div className="space-y-3">
-            {chosenFeats.map(f => (
-              <div key={f.name} className="border border-pink-950/40 rounded-xl p-3 bg-[#030b18]/60">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-bold text-pink-200">{f.name}</p>
-                  <button
-                    onClick={() => toggleFeat(f.name)}
-                    className="text-pink-700/50 hover:text-rose-400 transition-colors text-sm flex-shrink-0"
-                    title="Remove feat"
-                  >✕</button>
-                </div>
-                {f.prerequisite && (
-                  <p className="text-[10px] text-pink-300/40 mb-1.5">{f.prerequisite}</p>
-                )}
-                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{f.description}</p>
-              </div>
+          <SH>Chosen Feats</SH>
+          <div className="flex flex-wrap gap-2">
+            {feats.map(name => (
+              <button
+                key={name}
+                onClick={() => toggleFeat(name)}
+                className="bg-pink-900/40 border border-pink-600/50 text-pink-200 text-xs px-2.5 py-1 rounded-full hover:bg-red-900/30 hover:border-red-700/40 hover:text-red-300 transition-colors"
+                title="Click to remove"
+              >
+                {name} ✕
+              </button>
             ))}
           </div>
         </Card>
       )}
+
+      <div className="flex gap-2 flex-wrap">
+        <input
+          type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search feats…"
+          className="flex-1 min-w-40 bg-[#030b18] border border-pink-950/40 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-pink-700/50 placeholder-slate-700"
+        />
+        <button
+          onClick={() => setShowChosen(v => !v)}
+          className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${showChosen ? 'bg-pink-800 border-pink-600 text-white' : 'bg-[#030b18] border-pink-950/40 text-slate-400 hover:text-slate-200 hover:bg-pink-950/30'}`}
+        >Chosen Only</button>
+      </div>
+
+      <div className="space-y-1.5">
+        {filtered.map(feat => {
+          const chosen = feats.includes(feat.name)
+          return (
+            <button
+              key={feat.name}
+              onClick={() => toggleFeat(feat.name)}
+              className={`w-full text-left p-3 rounded-xl border transition-all
+                ${chosen ? 'bg-pink-900/30 border-pink-600/50' : 'bg-[#030b18]/60 border-pink-950/30 hover:border-pink-800/50'}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center
+                  ${chosen ? 'bg-pink-500 border-pink-400' : 'border-pink-900/50'}`}>
+                  {chosen && <span className="text-white text-xs font-bold">✓</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-slate-200">{feat.name}</span>
+                    {feat.category && (
+                      <span className="text-[10px] bg-pink-950/40 border border-pink-900/40 text-pink-400/60 px-1.5 py-0.5 rounded-full">
+                        {FEAT_CAT[feat.category] || feat.category}
+                      </span>
+                    )}
+                    {feat.prerequisite && <span className="text-xs text-slate-500">Req: {feat.prerequisite}</span>}
+                    <span className="text-xs text-slate-600 ml-auto">{feat.source}</span>
+                  </div>
+                  <p className="text-xs text-slate-400/70 mt-1 leading-relaxed line-clamp-2">{feat.description}</p>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+        {filtered.length === 0 && (
+          <p className="text-slate-500 text-sm text-center py-8">No feats match your search.</p>
+        )}
+      </div>
     </div>
   )
 }

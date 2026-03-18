@@ -5,8 +5,102 @@ import DiceBox from '@3d-dice/dice-box'
 // ── Asset path — adapts to dev ("/") and prod ("/Lunaris/") ──────────────────
 const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
 
+// ── Inject pop/shake keyframes once ──────────────────────────────────────────
+;(function injectStyles() {
+  if (document.getElementById('dice-roller-styles')) return
+  const s = document.createElement('style')
+  s.id = 'dice-roller-styles'
+  s.textContent = `
+    @keyframes dicePop {
+      0%   { transform: scale(0.25) rotate(-8deg); opacity: 0; }
+      55%  { transform: scale(1.3)  rotate(3deg);  opacity: 1; }
+      75%  { transform: scale(0.9)  rotate(-1deg); }
+      100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+    }
+    @keyframes dicePopTotal {
+      0%   { transform: scale(0.2); opacity: 0; }
+      60%  { transform: scale(1.45); opacity: 1; }
+      80%  { transform: scale(0.88); }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+    @keyframes critFlash {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0.4; }
+    }
+    .dice-pop        { animation: dicePop     0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+    .dice-pop-total  { animation: dicePopTotal 0.5s  cubic-bezier(0.34,1.56,0.64,1) both; }
+    .dice-crit-flash { animation: critFlash 0.4s ease-in-out 3; }
+  `
+  document.head.appendChild(s)
+})()
+
+// ── Synthesised SFX ───────────────────────────────────────────────────────────
+
+function playRollSfx() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const now = ctx.currentTime
+    // 9 noise bursts — descending timing simulates dice tumbling to rest
+    for (let i = 0; i < 9; i++) {
+      const t   = now + i * 0.1 + Math.random() * 0.04
+      const dur = 0.07 + Math.random() * 0.05
+      const len = Math.floor(ctx.sampleRate * dur)
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+      const ch  = buf.getChannelData(0)
+      for (let j = 0; j < len; j++) ch[j] = Math.random() * 2 - 1
+
+      const src    = ctx.createBufferSource()
+      src.buffer   = buf
+
+      const filt       = ctx.createBiquadFilter()
+      filt.type        = 'bandpass'
+      filt.frequency.value = 500 + Math.random() * 700
+      filt.Q.value     = 0.8
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(0.18 * (1 - i * 0.07), t + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+
+      src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
+      src.start(t); src.stop(t + dur + 0.02)
+    }
+    setTimeout(() => ctx.close(), 2200)
+  } catch (_) {}
+}
+
+function playLandSfx() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const now = ctx.currentTime
+    // Two quick impact thuds
+    for (let hit = 0; hit < 2; hit++) {
+      const t   = now + hit * 0.07
+      const dur = 0.12
+      const len = Math.floor(ctx.sampleRate * dur)
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+      const ch  = buf.getChannelData(0)
+      for (let j = 0; j < len; j++) ch[j] = (Math.random() * 2 - 1) * Math.exp(-j / (len * 0.18))
+
+      const src  = ctx.createBufferSource()
+      src.buffer = buf
+
+      const filt       = ctx.createBiquadFilter()
+      filt.type        = 'lowpass'
+      filt.frequency.value = 350 - hit * 80
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.35 - hit * 0.1, t)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+
+      src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
+      src.start(t); src.stop(t + dur + 0.02)
+    }
+    setTimeout(() => ctx.close(), 600)
+  } catch (_) {}
+}
+
 // ── Notation parser ───────────────────────────────────────────────────────────
-// Handles: "1d6+4 slashing", "2d8-1 piercing", "1d20+3", "1d4"
 
 function parseDamage(notation) {
   const cleaned = (notation || '').trim()
@@ -18,7 +112,6 @@ function parseDamage(notation) {
     modifier:   match[3] ? parseInt(match[3], 10) : 0,
     damageType: match[4] ? match[4].trim() : '',
     raw:        cleaned,
-    // strip damage type for dice-box: "1d6+4"
     notation:   `${match[1]}d${match[2]}${match[3] || ''}`,
   }
 }
@@ -68,7 +161,7 @@ function getTheme(theme) {
 
 // ── Result breakdown panel ────────────────────────────────────────────────────
 
-function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain, isRolling, t }) {
+function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain, isRolling, t, rollKey }) {
   const diceValues = rollResult?.rolls?.[0]?.dice?.map(d => d.value) ?? []
   const diceSum    = diceValues.reduce((a, b) => a + b, 0)
   const modifier   = parsed?.modifier ?? 0
@@ -77,16 +170,26 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
   const isCrit     = diceValues.length > 0 && diceValues.every(v => v === sides)
   const isFumble   = diceValues.length > 0 && diceValues.every(v => v === 1)
 
+  // Staggered delays for each die
+  const delays = ['0ms','60ms','120ms','180ms','240ms','300ms','360ms','420ms']
+
   return (
     <div className="flex flex-col gap-3">
       {/* Dice breakdown row */}
       {diceValues.length > 0 && (
         <div className="flex items-center justify-center flex-wrap gap-2">
           {diceValues.map((v, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div
+              key={`${rollKey}-die-${i}`}
+              className="flex items-center gap-2"
+            >
               {i > 0 && <span className={`text-lg font-light select-none ${t.plus}`}>+</span>}
-              <div className={`w-12 h-12 rounded-xl border-2 flex flex-col items-center justify-center select-none ${t.dieBreak}`}>
-                <span className="text-xl font-bold leading-none tabular-nums">{v}</span>
+              <div
+                className={`dice-pop w-14 h-14 rounded-xl border-2 flex flex-col items-center justify-center select-none
+                  ${t.dieBreak} ${isCrit ? 'dice-crit-flash' : ''}`}
+                style={{ animationDelay: delays[i] || '0ms' }}
+              >
+                <span className="text-2xl font-bold leading-none tabular-nums">{v}</span>
                 <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${t.label}`}>d{sides}</span>
               </div>
             </div>
@@ -99,10 +202,10 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
               <button
                 onClick={onToggleMod}
                 title={modEnabled ? 'Remove modifier' : 'Add modifier back'}
-                className={`w-12 h-12 rounded-xl border-2 flex flex-col items-center justify-center transition-all
+                className={`w-14 h-14 rounded-xl border-2 flex flex-col items-center justify-center transition-all
                   ${t.modBg} ${modEnabled ? '' : 'opacity-35'}`}
               >
-                <span className={`text-xl font-bold leading-none tabular-nums ${modEnabled ? t.modActive : 'text-slate-600 line-through'}`}>
+                <span className={`text-2xl font-bold leading-none tabular-nums ${modEnabled ? t.modActive : 'text-slate-600 line-through'}`}>
                   {modifier > 0 ? '+' : ''}{modifier}
                 </span>
                 <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${t.label}`}>mod</span>
@@ -112,9 +215,13 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
 
           <span className={`text-lg font-light select-none ${t.plus}`}>=</span>
 
-          {/* Total */}
-          <div className={`min-w-[52px] h-12 rounded-xl border-2 px-3 flex flex-col items-center justify-center ${t.totalBg}`}>
-            <span className={`text-2xl font-bold leading-none tabular-nums ${isCrit ? t.critColor : isFumble ? t.fumColor : t.totalText}`}>
+          {/* Total — big pop */}
+          <div
+            key={`${rollKey}-total`}
+            className={`dice-pop-total min-w-[64px] h-14 rounded-xl border-2 px-3 flex flex-col items-center justify-center ${t.totalBg}`}
+            style={{ animationDelay: `${(diceValues.length) * 55 + 40}ms` }}
+          >
+            <span className={`text-3xl font-bold leading-none tabular-nums ${isCrit ? t.critColor : isFumble ? t.fumColor : t.totalText}`}>
               {total}
             </span>
           </div>
@@ -153,6 +260,7 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
   const [isRolling, setIsRolling]   = useState(false)
   const [modEnabled, setModEnabled] = useState(true)
   const [visible, setVisible]       = useState(false)
+  const [rollKey, setRollKey]       = useState(0)
 
   // Slide-in animation
   useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
@@ -165,9 +273,10 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
     box.onRollComplete = (result) => {
       setRollResult(result)
       setIsRolling(false)
+      setRollKey(k => k + 1)
+      playLandSfx()
     }
 
-    // Kick off the first roll
     doRoll()
 
     return () => {
@@ -183,6 +292,7 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
     setIsRolling(true)
     setRollResult(null)
     setModEnabled(true)
+    playRollSfx()
     diceBoxRef.current.roll(parsed.notation).catch(() => setIsRolling(false))
   }
 
@@ -194,14 +304,14 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
 
   return createPortal(
     <>
-      {/* Dim backdrop — clicking dismisses */}
+      {/* Dim backdrop */}
       <div
         className={`fixed inset-0 z-[100] transition-opacity duration-200 ${t.overlay}`}
         style={{ opacity: visible ? 1 : 0 }}
         onClick={handleClose}
       />
 
-      {/* Result tray slides up from bottom */}
+      {/* Result tray slides up */}
       <div
         className={`
           fixed bottom-0 left-0 right-0 z-[103]
@@ -242,6 +352,7 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
               onRollAgain={doRoll}
               isRolling={isRolling}
               t={t}
+              rollKey={rollKey}
             />
           )
         }
@@ -260,9 +371,7 @@ export function DiceRollerProvider({ children }) {
   const [boxReady, setBoxReady] = useState(false)
   const [request, setRequest]   = useState(null)
 
-  // Create the DiceBox instance once on mount
   useEffect(() => {
-    // DiceBox needs a real DOM element as its container
     const el = document.createElement('div')
     el.id = 'dice-box-host'
     el.style.cssText = 'position:fixed;inset:0;z-index:102;pointer-events:none;'
@@ -274,15 +383,15 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        scale:            7,
+        scale:            12,
         gravity:          1,
         mass:             1,
         friction:         0.8,
         restitution:      0,
         angularDamping:   0.4,
         linearDamping:    0.4,
-        spinForce:        4,
-        throwForce:       5,
+        spinForce:        5,
+        throwForce:       6,
         startingHeight:   8,
         settleTimeout:    5000,
         offscreen:        true,
