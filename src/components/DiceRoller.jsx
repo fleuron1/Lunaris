@@ -2,8 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { createPortal } from 'react-dom'
 import DiceBox from '@3d-dice/dice-box'
 
-// ── Asset path — adapts to dev ("/") and prod ("/Lunaris/") ──────────────────
-const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
+// ── Asset paths ───────────────────────────────────────────────────────────────
+const ASSET_PATH   = import.meta.env.BASE_URL + 'assets/dice-box/'
+const ROLL_SFX_URL = import.meta.env.BASE_URL + 'assets/dice-roll.mp4'
 
 // ── Inject pop/shake keyframes once ──────────────────────────────────────────
 ;(function injectStyles() {
@@ -19,84 +20,32 @@ const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
     }
     @keyframes dicePopTotal {
       0%   { transform: scale(0.2); opacity: 0; }
-      60%  { transform: scale(1.45); opacity: 1; }
+      60%  { transform: scale(1.5); opacity: 1; }
       80%  { transform: scale(0.88); }
       100% { transform: scale(1);   opacity: 1; }
     }
     @keyframes critFlash {
       0%,100% { opacity: 1; }
-      50%     { opacity: 0.4; }
+      50%     { opacity: 0.3; }
     }
-    .dice-pop        { animation: dicePop     0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+    .dice-pop        { animation: dicePop      0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
     .dice-pop-total  { animation: dicePopTotal 0.5s  cubic-bezier(0.34,1.56,0.64,1) both; }
-    .dice-crit-flash { animation: critFlash 0.4s ease-in-out 3; }
+    .dice-crit-flash { animation: critFlash 0.35s ease-in-out 4; }
   `
   document.head.appendChild(s)
 })()
 
-// ── Synthesised SFX ───────────────────────────────────────────────────────────
+// ── SFX ───────────────────────────────────────────────────────────────────────
 
+let rollAudio = null
 function playRollSfx() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const now = ctx.currentTime
-    // 9 noise bursts — descending timing simulates dice tumbling to rest
-    for (let i = 0; i < 9; i++) {
-      const t   = now + i * 0.1 + Math.random() * 0.04
-      const dur = 0.07 + Math.random() * 0.05
-      const len = Math.floor(ctx.sampleRate * dur)
-      const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-      const ch  = buf.getChannelData(0)
-      for (let j = 0; j < len; j++) ch[j] = Math.random() * 2 - 1
-
-      const src    = ctx.createBufferSource()
-      src.buffer   = buf
-
-      const filt       = ctx.createBiquadFilter()
-      filt.type        = 'bandpass'
-      filt.frequency.value = 500 + Math.random() * 700
-      filt.Q.value     = 0.8
-
-      const gain = ctx.createGain()
-      gain.gain.setValueAtTime(0, t)
-      gain.gain.linearRampToValueAtTime(0.18 * (1 - i * 0.07), t + 0.012)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-
-      src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
-      src.start(t); src.stop(t + dur + 0.02)
+    if (!rollAudio) {
+      rollAudio = new Audio(ROLL_SFX_URL)
+      rollAudio.volume = 0.85
     }
-    setTimeout(() => ctx.close(), 2200)
-  } catch (_) {}
-}
-
-function playLandSfx() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const now = ctx.currentTime
-    // Two quick impact thuds
-    for (let hit = 0; hit < 2; hit++) {
-      const t   = now + hit * 0.07
-      const dur = 0.12
-      const len = Math.floor(ctx.sampleRate * dur)
-      const buf = ctx.createBuffer(1, len, ctx.sampleRate)
-      const ch  = buf.getChannelData(0)
-      for (let j = 0; j < len; j++) ch[j] = (Math.random() * 2 - 1) * Math.exp(-j / (len * 0.18))
-
-      const src  = ctx.createBufferSource()
-      src.buffer = buf
-
-      const filt       = ctx.createBiquadFilter()
-      filt.type        = 'lowpass'
-      filt.frequency.value = 350 - hit * 80
-
-      const gain = ctx.createGain()
-      gain.gain.setValueAtTime(0.35 - hit * 0.1, t)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-
-      src.connect(filt); filt.connect(gain); gain.connect(ctx.destination)
-      src.start(t); src.stop(t + dur + 0.02)
-    }
-    setTimeout(() => ctx.close(), 600)
+    rollAudio.currentTime = 0
+    rollAudio.play().catch(() => {})
   } catch (_) {}
 }
 
@@ -162,27 +111,24 @@ function getTheme(theme) {
 // ── Result breakdown panel ────────────────────────────────────────────────────
 
 function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain, isRolling, t, rollKey }) {
-  const diceValues = rollResult?.rolls?.[0]?.dice?.map(d => d.value) ?? []
+  // Result is an array: rollResult[0].rolls = individual die values
+  const group      = rollResult?.[0]
+  const diceValues = group?.rolls?.map(d => d.value) ?? []
   const diceSum    = diceValues.reduce((a, b) => a + b, 0)
   const modifier   = parsed?.modifier ?? 0
   const total      = diceSum + (modEnabled ? modifier : 0)
-  const sides      = parsed?.sides ?? 6
+  const sides      = parsed?.sides ?? group?.sides ?? 6
   const isCrit     = diceValues.length > 0 && diceValues.every(v => v === sides)
   const isFumble   = diceValues.length > 0 && diceValues.every(v => v === 1)
 
-  // Staggered delays for each die
   const delays = ['0ms','60ms','120ms','180ms','240ms','300ms','360ms','420ms']
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Dice breakdown row */}
       {diceValues.length > 0 && (
         <div className="flex items-center justify-center flex-wrap gap-2">
           {diceValues.map((v, i) => (
-            <div
-              key={`${rollKey}-die-${i}`}
-              className="flex items-center gap-2"
-            >
+            <div key={`${rollKey}-die-${i}`} className="flex items-center gap-2">
               {i > 0 && <span className={`text-lg font-light select-none ${t.plus}`}>+</span>}
               <div
                 className={`dice-pop w-14 h-14 rounded-xl border-2 flex flex-col items-center justify-center select-none
@@ -195,7 +141,7 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
             </div>
           ))}
 
-          {/* Modifier pill — click to toggle */}
+          {/* Modifier pill */}
           {modifier !== 0 && (
             <>
               <span className={`text-lg font-light select-none ${t.plus}`}>+</span>
@@ -219,7 +165,7 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
           <div
             key={`${rollKey}-total`}
             className={`dice-pop-total min-w-[64px] h-14 rounded-xl border-2 px-3 flex flex-col items-center justify-center ${t.totalBg}`}
-            style={{ animationDelay: `${(diceValues.length) * 55 + 40}ms` }}
+            style={{ animationDelay: `${diceValues.length * 55 + 40}ms` }}
           >
             <span className={`text-3xl font-bold leading-none tabular-nums ${isCrit ? t.critColor : isFumble ? t.fumColor : t.totalText}`}>
               {total}
@@ -262,10 +208,8 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
   const [visible, setVisible]       = useState(false)
   const [rollKey, setRollKey]       = useState(0)
 
-  // Slide-in animation
   useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
 
-  // Wire DiceBox callbacks to this roll session
   useEffect(() => {
     const box = diceBoxRef.current
     if (!box || !parsed) return
@@ -274,7 +218,6 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
       setRollResult(result)
       setIsRolling(false)
       setRollKey(k => k + 1)
-      playLandSfx()
     }
 
     doRoll()
@@ -304,14 +247,12 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
 
   return createPortal(
     <>
-      {/* Dim backdrop */}
       <div
         className={`fixed inset-0 z-[100] transition-opacity duration-200 ${t.overlay}`}
         style={{ opacity: visible ? 1 : 0 }}
         onClick={handleClose}
       />
 
-      {/* Result tray slides up */}
       <div
         className={`
           fixed bottom-0 left-0 right-0 z-[103]
@@ -383,7 +324,7 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        scale:            12,
+        scale:            50,
         gravity:          1,
         mass:             1,
         friction:         0.8,
