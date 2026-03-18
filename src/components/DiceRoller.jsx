@@ -36,7 +36,6 @@ const ROLL_SFX_URL = import.meta.env.BASE_URL + 'assets/dice-roll.mp4'
 })()
 
 // ── SFX ───────────────────────────────────────────────────────────────────────
-
 let rollAudio = null
 function playRollSfx() {
   try {
@@ -49,8 +48,47 @@ function playRollSfx() {
   } catch (_) {}
 }
 
-// ── Notation parser ───────────────────────────────────────────────────────────
+// ── Module-level DiceBox singleton ────────────────────────────────────────────
+// Created once at module level — never inside a React component.
+// scale=6 is the library default and correctly fits the physics world.
+// Higher scales cause dice to spawn outside physics walls and disappear.
+let _box = null
+let _initPromise = null
 
+function initDiceBox() {
+  if (_initPromise) return _initPromise
+
+  const el = document.createElement('div')
+  el.id = 'dice-box-host'
+  el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
+  document.body.appendChild(el)
+
+  _box = new DiceBox({
+    assetPath:      ASSET_PATH,
+    container:      '#dice-box-host',
+    id:             'dice-canvas',
+    scale:          6,
+    gravity:        2,
+    mass:           1,
+    friction:       0.8,
+    restitution:    0.2,
+    angularDamping: 0.4,
+    linearDamping:  0.5,
+    spinForce:      8,
+    throwForce:     9,
+    startingHeight: 10,
+    settleTimeout:  6000,
+    offscreen:      false,
+    delay:          10,
+    enableShadows:  true,
+    lightIntensity: 1,
+  })
+
+  _initPromise = _box.init()
+  return _initPromise
+}
+
+// ── Notation parser ───────────────────────────────────────────────────────────
 function parseDamage(notation) {
   const cleaned = (notation || '').trim()
   const match = cleaned.match(/^(\d+)d(\d+)([+-]\d+)?(?:\s+(.+))?$/i)
@@ -66,7 +104,6 @@ function parseDamage(notation) {
 }
 
 // ── Theme helpers ─────────────────────────────────────────────────────────────
-
 function getTheme(theme) {
   if (theme === 'pink') return {
     overlay:   'bg-[#030b18]/60',
@@ -109,9 +146,7 @@ function getTheme(theme) {
 }
 
 // ── Result breakdown panel ────────────────────────────────────────────────────
-
 function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain, isRolling, t, rollKey }) {
-  // Result is an array: rollResult[0].rolls = individual die values
   const group      = rollResult?.[0]
   const diceValues = group?.rolls?.map(d => d.value) ?? []
   const diceSum    = diceValues.reduce((a, b) => a + b, 0)
@@ -141,7 +176,6 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
             </div>
           ))}
 
-          {/* Modifier pill */}
           {modifier !== 0 && (
             <>
               <span className={`text-lg font-light select-none ${t.plus}`}>+</span>
@@ -161,7 +195,6 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
 
           <span className={`text-lg font-light select-none ${t.plus}`}>=</span>
 
-          {/* Total — big pop */}
           <div
             key={`${rollKey}-total`}
             className={`dice-pop-total min-w-[64px] h-14 rounded-xl border-2 px-3 flex flex-col items-center justify-center ${t.totalBg}`}
@@ -197,55 +230,53 @@ function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain,
 }
 
 // ── Overlay (portal) ──────────────────────────────────────────────────────────
-
-function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
+// The overlay only mounts when boxReady=true, so _box is guaranteed initialized.
+function DiceRollerOverlay({ label, damage, theme, onClose }) {
   const t      = getTheme(theme)
   const parsed = parseDamage(damage)
 
   const [rollResult, setRollResult] = useState(null)
-  const [isRolling, setIsRolling]   = useState(false)
+  const [isRolling, setIsRolling]   = useState(true)
   const [modEnabled, setModEnabled] = useState(true)
   const [visible, setVisible]       = useState(false)
   const [rollKey, setRollKey]       = useState(0)
-  const isFirstRoll                 = useRef(true)
-
-  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+  const didRoll                     = useRef(false)
 
   useEffect(() => {
-    const box = diceBoxRef.current
-    if (!box || !parsed) return
+    requestAnimationFrame(() => setVisible(true))
 
-    box.onRollComplete = (result) => {
+    _box.onRollComplete = (result) => {
       setRollResult(result)
       setIsRolling(false)
       setRollKey(k => k + 1)
     }
 
-    doRoll()
+    // Guard against StrictMode double-fire
+    if (!didRoll.current && parsed) {
+      didRoll.current = true
+      _box.roll(parsed.notation).catch(() => setIsRolling(false))
+    }
 
     return () => {
-      if (diceBoxRef.current) {
-        diceBoxRef.current.onRollComplete = null
-        diceBoxRef.current.clear?.()
+      if (_box) {
+        _box.onRollComplete = null
+        _box.clear?.()
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function doRoll() {
-    if (!diceBoxRef.current || !parsed) return
+  function doRollAgain() {
+    if (!_box || !parsed) return
     setIsRolling(true)
     setRollResult(null)
     setModEnabled(true)
-    // First roll audio is played by the provider's roll() (direct user click).
-    // Subsequent Roll Again clicks call doRoll() directly, so play here.
-    if (!isFirstRoll.current) playRollSfx()
-    isFirstRoll.current = false
-    diceBoxRef.current.roll(parsed.notation).catch(() => setIsRolling(false))
+    playRollSfx()
+    _box.roll(parsed.notation).catch(() => setIsRolling(false))
   }
 
   function handleClose() {
     setVisible(false)
-    diceBoxRef.current?.clear?.()
+    _box?.clear?.()
     setTimeout(onClose, 220)
   }
 
@@ -294,7 +325,7 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
               rollResult={rollResult}
               modEnabled={modEnabled}
               onToggleMod={() => setModEnabled(e => !e)}
-              onRollAgain={doRoll}
+              onRollAgain={doRollAgain}
               isRolling={isRolling}
               t={t}
               rollKey={rollKey}
@@ -308,65 +339,22 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
 }
 
 // ── Context / Provider ────────────────────────────────────────────────────────
-
 const DiceRollerContext = createContext(null)
 
 export function DiceRollerProvider({ children }) {
-  const diceBoxRef = useRef(null)
   const [boxReady, setBoxReady] = useState(false)
   const [request, setRequest]   = useState(null)
 
   useEffect(() => {
-    const el = document.createElement('div')
-    el.id = 'dice-box-host'
-    // Simple full-viewport container — no CSS transforms (breaks WebGL).
-    el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
-    document.body.appendChild(el)
-
-    let box = null
-    try {
-      box = new DiceBox({
-        assetPath:        ASSET_PATH,
-        container:        '#dice-box-host',
-        id:               'dice-canvas',
-        // Physics world defaults to 9.5 units — way too small for scale-50 dice (~25-unit colliders).
-        // We patched world.onscreen.js to accept `size` from config. size=55 gives a 110-unit arena.
-        size:             55,
-        scale:            50,
-        gravity:          2,
-        mass:             1,
-        friction:         0.8,
-        restitution:      0.1,
-        angularDamping:   0.4,
-        linearDamping:    0.4,
-        spinForce:        6,
-        throwForce:       5,
-        startingHeight:   12,
-        settleTimeout:    5000,
-        offscreen:        false,
-        delay:            10,
-        enableShadows:    true,
-        lightIntensity:   1,
-      })
-
-      box.init()
-        .then(() => { diceBoxRef.current = box; setBoxReady(true) })
-        .catch(err => console.warn('[DiceBox] init failed (dice rolling unavailable):', err))
-    } catch (err) {
-      console.warn('[DiceBox] constructor failed (dice rolling unavailable):', err)
-      el.remove()
-    }
-
-    return () => {
-      box?.clear?.()
-      el.remove()
-    }
+    // Initialize once. initDiceBox() returns the same promise on repeat calls.
+    initDiceBox()
+      .then(() => setBoxReady(true))
+      .catch(err => console.warn('[DiceBox] init failed (dice rolling unavailable):', err))
   }, [])
 
   const roll = useCallback((label, damage, theme = 'violet') => {
     if (!boxReady) return
-    // Play audio here — this IS a direct user-gesture call, so autoplay is allowed.
-    playRollSfx()
+    playRollSfx()   // synchronous from user click → autoplay allowed
     setRequest({ label, damage, theme, key: Date.now() })
   }, [boxReady])
 
@@ -381,7 +369,6 @@ export function DiceRollerProvider({ children }) {
           label={request.label}
           damage={request.damage}
           theme={request.theme}
-          diceBoxRef={diceBoxRef}
           onClose={close}
         />
       )}
