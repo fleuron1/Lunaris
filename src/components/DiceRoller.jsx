@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom'
 import DiceBox from '@3d-dice/dice-box'
 
 // ── Asset paths ───────────────────────────────────────────────────────────────
-const ASSET_PATH   = import.meta.env.BASE_URL + 'assets/dice-box/'
-const ROLL_SFX_URL = import.meta.env.BASE_URL + 'assets/dice-roll.mp4'
+const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
 
 // ── Inject pop/shake keyframes once ──────────────────────────────────────────
 ;(function injectStyles() {
@@ -35,16 +34,34 @@ const ROLL_SFX_URL = import.meta.env.BASE_URL + 'assets/dice-roll.mp4'
   document.head.appendChild(s)
 })()
 
-// ── SFX ───────────────────────────────────────────────────────────────────────
-let rollAudio = null
+// ── SFX (Web Audio API synthesized dice rattle) ──────────────────────────────
+let audioCtx = null
 function playRollSfx() {
   try {
-    if (!rollAudio) {
-      rollAudio = new Audio(ROLL_SFX_URL)
-      rollAudio.volume = 0.85
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const ctx = audioCtx
+    const now = ctx.currentTime
+    // Short burst of filtered noise = dice clatter
+    const dur = 0.35
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) {
+      const t = i / ctx.sampleRate
+      // Decaying noise with a few "bounce" bumps
+      const env = Math.exp(-t * 12) * (1 + 0.6 * Math.sin(t * 140))
+      data[i] = (Math.random() * 2 - 1) * env * 0.4
     }
-    rollAudio.currentTime = 0
-    rollAudio.play().catch(() => {})
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    // Bandpass for a woody/plastic dice sound
+    const filt = ctx.createBiquadFilter()
+    filt.type = 'bandpass'
+    filt.frequency.value = 3200
+    filt.Q.value = 1.2
+    const gain = ctx.createGain()
+    gain.gain.value = 0.7
+    src.connect(filt).connect(gain).connect(ctx.destination)
+    src.start(now)
   } catch (_) {}
 }
 
