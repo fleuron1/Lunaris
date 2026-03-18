@@ -47,6 +47,8 @@ function StatBox({ label, value, sub }) {
 // ── Ability Scores + Saving Throws ───────────────────────────────────────────
 
 function AbilityBlock({ abilityScores, profBonus }) {
+  const { roll } = useDiceRoller()
+
   return (
     <Card className="p-4">
       <SH>Ability Scores</SH>
@@ -54,12 +56,18 @@ function AbilityBlock({ abilityScores, profBonus }) {
         {Object.entries(ABILITIES).map(([key, { label }]) => {
           const score = abilityScores?.[key] ?? 10
           const m = mod(score)
+          const notation = m >= 0 ? `1d20+${m}` : `1d20-${Math.abs(m)}`
           return (
-            <div key={key} className="bg-[#030b18] rounded-lg p-2 text-center border border-pink-950/40 hover:border-pink-800/40 transition-colors">
-              <p className="text-base font-bold text-pink-400 leading-none">{fmtMod(m)}</p>
+            <button
+              key={key}
+              onClick={() => roll(`${label} Check`, notation, 'pink')}
+              title={`Roll ${label} check (${notation})`}
+              className="bg-[#030b18] rounded-lg p-2 text-center border border-pink-950/40 hover:border-pink-600/50 hover:bg-pink-950/20 transition-all group cursor-pointer"
+            >
+              <p className="text-base font-bold text-pink-400 leading-none group-hover:text-pink-300">{fmtMod(m)}</p>
               <p className="text-xs text-sky-200/70 font-semibold tabular-nums">{score}</p>
               <p className="text-[9px] text-pink-300/35 uppercase tracking-widest mt-0.5">{label}</p>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -69,16 +77,21 @@ function AbilityBlock({ abilityScores, profBonus }) {
           const isProficient = SAVE_PROFS.has(key)
           const score = abilityScores?.[key] ?? 10
           const total = mod(score) + (isProficient ? profBonus : 0)
+          const notation = total >= 0 ? `1d20+${total}` : `1d20-${Math.abs(total)}`
           return (
-            <div key={key} className="flex items-center gap-2">
+            <button
+              key={key}
+              onClick={() => roll(`${label} Save`, notation, 'pink')}
+              className="flex items-center gap-2 w-full py-0.5 hover:bg-pink-950/20 rounded px-1 -mx-1 transition-colors group cursor-pointer"
+            >
               <span className={`w-2.5 h-2.5 rounded-full border flex-shrink-0 ${
                 isProficient ? 'bg-pink-500 border-pink-400' : 'bg-transparent border-pink-900/40'
               }`} />
-              <span className="text-xs text-slate-300 flex-1">{label}</span>
+              <span className="text-xs text-slate-300 flex-1 text-left group-hover:text-slate-200">{label}</span>
               <span className={`text-xs font-bold tabular-nums ${isProficient ? 'text-pink-400' : 'text-slate-500'}`}>
                 {fmtMod(total)}
               </span>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -89,6 +102,7 @@ function AbilityBlock({ abilityScores, profBonus }) {
 // ── Skills ────────────────────────────────────────────────────────────────────
 
 function SkillsBlock({ abilityScores, profBonus, skillProfs }) {
+  const { roll } = useDiceRoller()
   return (
     <Card className="p-4">
       <SH>Skills</SH>
@@ -97,21 +111,26 @@ function SkillsBlock({ abilityScores, profBonus, skillProfs }) {
           const prof = skillProfs?.[skill.name]
           const score = abilityScores?.[skill.ability] ?? 10
           const total = mod(score) + (prof === 'expert' ? profBonus * 2 : prof === 'proficient' ? profBonus : 0)
+          const notation = total >= 0 ? `1d20+${total}` : `1d20-${Math.abs(total)}`
           return (
-            <div key={skill.name} className="flex items-center gap-2 py-[3px]">
+            <button
+              key={skill.name}
+              onClick={() => roll(skill.name, notation, 'pink')}
+              className="flex items-center gap-2 py-[3px] w-full hover:bg-pink-950/20 rounded px-1 -mx-1 transition-colors group cursor-pointer"
+            >
               <span className={`w-2 h-2 rounded-full border flex-shrink-0 ${
                 prof === 'expert'     ? 'bg-sky-400 border-sky-300' :
                 prof === 'proficient' ? 'bg-pink-500 border-pink-400' :
                 'bg-transparent border-pink-900/40'
               }`} />
-              <span className="text-xs text-slate-300 flex-1 truncate">{skill.name}</span>
+              <span className="text-xs text-slate-300 flex-1 truncate text-left group-hover:text-slate-200">{skill.name}</span>
               <span className="text-[10px] text-pink-300/30 mr-0.5">{ABILITIES[skill.ability]?.label}</span>
               <span className={`text-xs font-bold tabular-nums w-6 text-right ${
                 prof ? 'text-pink-400' : 'text-slate-500'
               }`}>
                 {fmtMod(total)}
               </span>
-            </div>
+            </button>
           )
         })}
       </div>

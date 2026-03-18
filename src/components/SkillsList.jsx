@@ -1,7 +1,10 @@
 import { SKILLS } from '../data/annabelle.js'
 import { getMod, fmtMod } from './AbilityBlock.jsx'
+import { useDiceRoller } from './DiceRoller.jsx'
 
 export default function SkillsList({ abilityScores, profBonus, skillProfs }) {
+  const { roll } = useDiceRoller()
+
   return (
     <div className="card p-4">
       <p className="section-header">Skills</p>
@@ -16,8 +19,13 @@ export default function SkillsList({ abilityScores, profBonus, skillProfs }) {
               : abilMod
           const isProf = profLevel === 'proficient'
           const isExpert = profLevel === 'expert'
+          const notation = bonus >= 0 ? `1d20+${bonus}` : `1d20-${Math.abs(bonus)}`
           return (
-            <div key={skill.name} className="flex items-center gap-2 py-[3px] hover:bg-violet-900/10 rounded px-1 transition-colors">
+            <button
+              key={skill.name}
+              onClick={() => roll(skill.name, notation, 'violet')}
+              className="flex items-center gap-2 py-[3px] w-full hover:bg-violet-900/15 rounded px-1 -mx-1 transition-colors group cursor-pointer"
+            >
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 isExpert
                   ? 'bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.5)]'
@@ -28,13 +36,13 @@ export default function SkillsList({ abilityScores, profBonus, skillProfs }) {
               <span className="text-[10px] text-violet-300/40 uppercase tracking-wider w-8 flex-shrink-0">
                 {skill.ability}
               </span>
-              <span className="flex-1 text-slate-300 text-xs">{skill.name}</span>
+              <span className="flex-1 text-slate-300 text-xs text-left group-hover:text-slate-200">{skill.name}</span>
               <span className={`font-bold tabular-nums text-xs ${
                 isExpert ? 'text-amber-300' : isProf ? 'text-violet-300' : 'text-slate-400'
               }`}>
                 {fmtMod(bonus)}
               </span>
-            </div>
+            </button>
           )
         })}
       </div>

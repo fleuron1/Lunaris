@@ -1,8 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import DiceBox from '@3d-dice/dice-box'
+
+// ── Asset path — adapts to dev ("/") and prod ("/Lunaris/") ──────────────────
+const ASSET_PATH = import.meta.env.BASE_URL + 'assets/dice-box/'
 
 // ── Notation parser ───────────────────────────────────────────────────────────
-// Handles: "1d6+4 slashing", "2d8-1 piercing", "1d4+4", "1d10"
+// Handles: "1d6+4 slashing", "2d8-1 piercing", "1d20+3", "1d4"
 
 function parseDamage(notation) {
   const cleaned = (notation || '').trim()
@@ -13,348 +17,304 @@ function parseDamage(notation) {
     sides:      parseInt(match[2], 10),
     modifier:   match[3] ? parseInt(match[3], 10) : 0,
     damageType: match[4] ? match[4].trim() : '',
+    raw:        cleaned,
+    // strip damage type for dice-box: "1d6+4"
+    notation:   `${match[1]}d${match[2]}${match[3] || ''}`,
   }
-}
-
-function rollDie(sides) {
-  return Math.floor(Math.random() * sides) + 1
 }
 
 // ── Theme helpers ─────────────────────────────────────────────────────────────
 
 function getTheme(theme) {
   if (theme === 'pink') return {
-    bg:          'bg-[#030b18]/95',
-    border:      'border-pink-900/60',
-    dieBg:       'bg-[#060f1e]',
-    dieBorder:   'border-pink-700/60',
-    dieGlow:     'shadow-[0_0_18px_rgba(232,25,127,0.25)]',
-    dieText:     'text-pink-200',
-    dieLabel:    'text-pink-400/50',
-    modBg:       'bg-pink-950/60',
-    modBorder:   'border-pink-700/50',
-    modText:     'text-pink-300',
-    modGlow:     'shadow-[0_0_12px_rgba(232,25,127,0.15)]',
-    totalText:   'text-pink-100',
-    accent:      'text-pink-400',
-    btnBg:       'bg-pink-900/50 hover:bg-pink-800/70 border-pink-700/40',
-    closeHover:  'hover:text-pink-300',
-    divider:     'border-pink-900/40',
-    label:       'text-pink-300/60',
-    iconColor:   '#e8197f',
-    pip:         'bg-pink-500',
+    overlay:   'bg-[#030b18]/60',
+    panel:     'bg-[#060f1e]/95 border-pink-900/60',
+    label:     'text-pink-300/60',
+    titleText: 'text-white',
+    subText:   'text-pink-300/50',
+    totalBg:   'bg-pink-950/40 border-pink-800/40',
+    totalText: 'text-pink-100',
+    modBg:     'bg-pink-950/50 border-pink-700/40',
+    modActive: 'text-pink-200',
+    divider:   'border-pink-900/40',
+    btn:       'bg-pink-900/50 hover:bg-pink-800/70 border-pink-700/40 text-white',
+    closeBtn:  'text-slate-500 hover:text-pink-300',
+    pip:       'bg-pink-500',
+    dieBreak:  'bg-[#030b18] border-pink-900/40 text-pink-200',
+    plus:      'text-pink-700/60',
+    critColor: 'text-yellow-300',
+    fumColor:  'text-red-400',
   }
-  // violet / sorcerer
   return {
-    bg:          'bg-[#07091a]/95',
-    border:      'border-violet-900/60',
-    dieBg:       'bg-[#0c1030]',
-    dieBorder:   'border-violet-700/60',
-    dieGlow:     'shadow-[0_0_18px_rgba(139,92,246,0.25)]',
-    dieText:     'text-violet-200',
-    dieLabel:    'text-violet-400/50',
-    modBg:       'bg-violet-950/60',
-    modBorder:   'border-violet-700/50',
-    modText:     'text-violet-300',
-    modGlow:     'shadow-[0_0_12px_rgba(139,92,246,0.15)]',
-    totalText:   'text-violet-100',
-    accent:      'text-violet-400',
-    btnBg:       'bg-violet-900/50 hover:bg-violet-800/70 border-violet-700/40',
-    closeHover:  'hover:text-violet-300',
-    divider:     'border-violet-900/40',
-    label:       'text-violet-300/60',
-    iconColor:   '#8b5cf6',
-    pip:         'bg-violet-500',
+    overlay:   'bg-[#07091a]/60',
+    panel:     'bg-[#0b0e24]/95 border-violet-900/60',
+    label:     'text-violet-300/60',
+    titleText: 'text-white',
+    subText:   'text-violet-300/50',
+    totalBg:   'bg-violet-950/40 border-violet-800/40',
+    totalText: 'text-violet-100',
+    modBg:     'bg-violet-950/50 border-violet-700/40',
+    modActive: 'text-violet-200',
+    divider:   'border-violet-900/40',
+    btn:       'bg-violet-900/50 hover:bg-violet-800/70 border-violet-700/40 text-white',
+    closeBtn:  'text-slate-500 hover:text-violet-300',
+    pip:       'bg-violet-500',
+    dieBreak:  'bg-[#0c1030] border-violet-900/40 text-violet-200',
+    plus:      'text-violet-700/60',
+    critColor: 'text-yellow-300',
+    fumColor:  'text-red-400',
   }
 }
 
-// ── Single die face ───────────────────────────────────────────────────────────
+// ── Result breakdown panel ────────────────────────────────────────────────────
 
-function DieFace({ sides, finalResult, isRolling, t }) {
-  const [display, setDisplay] = useState('?')
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-    if (!isRolling) {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      setDisplay(finalResult)
-      return
-    }
-    setDisplay('?')
-    intervalRef.current = setInterval(() => {
-      setDisplay(Math.floor(Math.random() * sides) + 1)
-    }, 55)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isRolling, finalResult, sides])
+function ResultPanel({ parsed, rollResult, modEnabled, onToggleMod, onRollAgain, isRolling, t }) {
+  const diceValues = rollResult?.rolls?.[0]?.dice?.map(d => d.value) ?? []
+  const diceSum    = diceValues.reduce((a, b) => a + b, 0)
+  const modifier   = parsed?.modifier ?? 0
+  const total      = diceSum + (modEnabled ? modifier : 0)
+  const sides      = parsed?.sides ?? 6
+  const isCrit     = diceValues.length > 0 && diceValues.every(v => v === sides)
+  const isFumble   = diceValues.length > 0 && diceValues.every(v => v === 1)
 
   return (
-    <div className={`
-      flex flex-col items-center justify-center
-      w-20 h-20 rounded-2xl border-2
-      transition-all duration-300 select-none
-      ${t.dieBg} ${t.dieBorder}
-      ${isRolling
-        ? 'animate-diceRoll opacity-80'
-        : `${t.dieGlow} scale-[1.07]`
-      }
-    `}>
-      <span className={`text-3xl font-bold leading-none tabular-nums ${t.dieText}`}>
-        {display}
-      </span>
-      <span className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${t.dieLabel}`}>
-        d{sides}
-      </span>
+    <div className="flex flex-col gap-3">
+      {/* Dice breakdown row */}
+      {diceValues.length > 0 && (
+        <div className="flex items-center justify-center flex-wrap gap-2">
+          {diceValues.map((v, i) => (
+            <div key={i} className="flex items-center gap-2">
+              {i > 0 && <span className={`text-lg font-light select-none ${t.plus}`}>+</span>}
+              <div className={`w-12 h-12 rounded-xl border-2 flex flex-col items-center justify-center select-none ${t.dieBreak}`}>
+                <span className="text-xl font-bold leading-none tabular-nums">{v}</span>
+                <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${t.label}`}>d{sides}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* Modifier pill — click to toggle */}
+          {modifier !== 0 && (
+            <>
+              <span className={`text-lg font-light select-none ${t.plus}`}>+</span>
+              <button
+                onClick={onToggleMod}
+                title={modEnabled ? 'Remove modifier' : 'Add modifier back'}
+                className={`w-12 h-12 rounded-xl border-2 flex flex-col items-center justify-center transition-all
+                  ${t.modBg} ${modEnabled ? '' : 'opacity-35'}`}
+              >
+                <span className={`text-xl font-bold leading-none tabular-nums ${modEnabled ? t.modActive : 'text-slate-600 line-through'}`}>
+                  {modifier > 0 ? '+' : ''}{modifier}
+                </span>
+                <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${t.label}`}>mod</span>
+              </button>
+            </>
+          )}
+
+          <span className={`text-lg font-light select-none ${t.plus}`}>=</span>
+
+          {/* Total */}
+          <div className={`min-w-[52px] h-12 rounded-xl border-2 px-3 flex flex-col items-center justify-center ${t.totalBg}`}>
+            <span className={`text-2xl font-bold leading-none tabular-nums ${isCrit ? t.critColor : isFumble ? t.fumColor : t.totalText}`}>
+              {total}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isCrit   && <p className={`text-center text-xs font-bold tracking-widest ${t.critColor}`}>⚡ CRITICAL HIT!</p>}
+      {isFumble && <p className={`text-center text-xs font-bold tracking-widest ${t.fumColor}`}>💀 FUMBLE</p>}
+
+      {modifier !== 0 && diceValues.length > 0 && (
+        <p className={`text-center text-[11px] ${t.label}`}>
+          {modEnabled ? 'Tap modifier to see raw roll' : `Raw · tap to add ${modifier > 0 ? '+' : ''}${modifier}`}
+        </p>
+      )}
+
+      <div className={`border-t ${t.divider}`} />
+
+      <button
+        onClick={onRollAgain}
+        disabled={isRolling}
+        className={`w-full py-2.5 rounded-xl font-bold text-sm border transition-all ${t.btn} ${isRolling ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        {isRolling ? '🎲 Rolling…' : '🎲 Roll Again'}
+      </button>
     </div>
   )
 }
 
-// ── Modifier pill ─────────────────────────────────────────────────────────────
+// ── Overlay (portal) ──────────────────────────────────────────────────────────
 
-function ModPill({ modifier, enabled, onToggle, t }) {
-  if (modifier === 0) return null
-  const sign = modifier > 0 ? '+' : ''
-
-  return (
-    <button
-      onClick={onToggle}
-      title={enabled ? 'Click to remove modifier from total' : 'Click to add modifier back'}
-      className={`
-        flex flex-col items-center justify-center
-        w-20 h-20 rounded-2xl border-2
-        transition-all duration-200 select-none
-        ${enabled
-          ? `${t.modBg} ${t.modBorder} ${t.modGlow}`
-          : 'bg-transparent border-slate-800/40 opacity-35'
-        }
-      `}
-    >
-      <span className={`text-2xl font-bold leading-none tabular-nums ${enabled ? t.modText : 'text-slate-600'}`}>
-        {sign}{modifier}
-      </span>
-      <span className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${enabled ? t.label : 'text-slate-700'}`}>
-        mod
-      </span>
-      {!enabled && (
-        <span className="text-[9px] text-slate-600 mt-0.5">off</span>
-      )}
-    </button>
-  )
-}
-
-// ── Plus / equals signs ───────────────────────────────────────────────────────
-
-function Op({ char, t }) {
-  return (
-    <span className={`text-2xl font-light ${t.label} select-none px-1`}>{char}</span>
-  )
-}
-
-// ── Main overlay ──────────────────────────────────────────────────────────────
-
-function DiceRollerOverlay({ label, damage, theme, onClose }) {
-  const t = getTheme(theme)
+function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
+  const t      = getTheme(theme)
   const parsed = parseDamage(damage)
 
-  // Roll state
-  const [diceResults, setDiceResults]     = useState([])
-  const [isRolling, setIsRolling]         = useState(false)
-  const [modEnabled, setModEnabled]       = useState(true)
-  const [hasRolled, setHasRolled]         = useState(false)
-  const [visible, setVisible]             = useState(false)
+  const [rollResult, setRollResult] = useState(null)
+  const [isRolling, setIsRolling]   = useState(false)
+  const [modEnabled, setModEnabled] = useState(true)
+  const [visible, setVisible]       = useState(false)
 
-  // Slide in
+  // Slide-in animation
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+
+  // Wire DiceBox callbacks to this roll session
   useEffect(() => {
-    requestAnimationFrame(() => setVisible(true))
-  }, [])
+    const box = diceBoxRef.current
+    if (!box || !parsed) return
+
+    box.onRollComplete = (result) => {
+      setRollResult(result)
+      setIsRolling(false)
+    }
+
+    // Kick off the first roll
+    doRoll()
+
+    return () => {
+      if (diceBoxRef.current) {
+        diceBoxRef.current.onRollComplete = null
+        diceBoxRef.current.clear?.()
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function doRoll() {
-    if (!parsed) return
+    if (!diceBoxRef.current || !parsed) return
     setIsRolling(true)
-    setHasRolled(false)
+    setRollResult(null)
     setModEnabled(true)
-
-    const results = Array.from({ length: parsed.count }, () => rollDie(parsed.sides))
-
-    setTimeout(() => {
-      setDiceResults(results)
-      setIsRolling(false)
-      setHasRolled(true)
-    }, 900)
+    diceBoxRef.current.roll(parsed.notation).catch(() => setIsRolling(false))
   }
-
-  // Auto-roll on mount
-  useEffect(() => { doRoll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!parsed) return null
-
-  const diceSum = diceResults.reduce((a, b) => a + b, 0)
-  const total   = diceSum + (modEnabled ? parsed.modifier : 0)
-  const isCrit  = diceResults.length > 0 && diceResults.every(r => r === parsed.sides)
-  const isFumble = diceResults.length > 0 && diceResults.every(r => r === 1)
 
   function handleClose() {
     setVisible(false)
-    setTimeout(onClose, 200)
+    diceBoxRef.current?.clear?.()
+    setTimeout(onClose, 220)
   }
 
   return createPortal(
     <>
-      {/* Backdrop */}
+      {/* Dim backdrop — clicking dismisses */}
       <div
-        className="fixed inset-0 z-[100] bg-black/40"
-        style={{ transition: 'opacity 0.2s', opacity: visible ? 1 : 0 }}
+        className={`fixed inset-0 z-[100] transition-opacity duration-200 ${t.overlay}`}
+        style={{ opacity: visible ? 1 : 0 }}
         onClick={handleClose}
       />
 
-      {/* Tray */}
+      {/* Result tray slides up from bottom */}
       <div
         className={`
-          fixed bottom-0 left-0 right-0 z-[101]
-          ${t.bg} border-t-2 ${t.border}
-          rounded-t-3xl px-6 pb-8 pt-5
-          shadow-[0_-8px_40px_rgba(0,0,0,0.6)]
+          fixed bottom-0 left-0 right-0 z-[103]
+          ${t.panel} border-t-2 rounded-t-3xl
+          px-6 pb-8 pt-4
+          shadow-[0_-8px_40px_rgba(0,0,0,0.7)]
+          max-w-[540px] mx-auto
         `}
         style={{
-          backdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(24px)',
           transition: 'transform 0.25s cubic-bezier(0.32,0.72,0,1)',
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          maxWidth: '560px',
-          margin: '0 auto',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center mb-4">
+        <div className="flex justify-center mb-3">
           <div className={`w-10 h-1 rounded-full ${t.pip} opacity-30`} />
         </div>
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-5">
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <p className={`text-lg font-bold text-white leading-none`} style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <p className={`text-lg font-bold leading-none ${t.titleText}`} style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
               {label}
             </p>
-            <p className={`text-sm mt-0.5 ${t.label}`}>
-              {damage}
-              {parsed.damageType && <span className="ml-1 capitalize">{parsed.damageType}</span>}
-            </p>
+            <p className={`text-sm mt-0.5 ${t.subText}`}>{damage}</p>
           </div>
-          <button
-            onClick={handleClose}
-            className={`text-slate-500 ${t.closeHover} transition-colors text-xl leading-none p-1`}
-          >
-            ✕
-          </button>
+          <button onClick={handleClose} className={`${t.closeBtn} transition-colors text-xl leading-none p-1`}>✕</button>
         </div>
 
-        {/* Dice area */}
-        <div className="flex items-center justify-center gap-2 flex-wrap mb-5 min-h-[80px]">
-          {/* Dice faces */}
-          {Array.from({ length: parsed.count }).map((_, i) => (
-            <div key={i} className="flex items-center gap-2">
-              {i > 0 && <Op char="+" t={t} />}
-              <DieFace
-                sides={parsed.sides}
-                finalResult={diceResults[i] ?? '?'}
-                isRolling={isRolling}
-                t={t}
-              />
-            </div>
-          ))}
-
-          {/* Modifier */}
-          {parsed.modifier !== 0 && (
-            <>
-              <Op char="+" t={t} />
-              <ModPill
-                modifier={parsed.modifier}
-                enabled={modEnabled}
-                onToggle={() => setModEnabled(e => !e)}
-                t={t}
-              />
-            </>
-          )}
-
-          {/* Total */}
-          {hasRolled && (
-            <>
-              <Op char="=" t={t} />
-              <div className="flex flex-col items-center">
-                <span
-                  className={`text-5xl font-bold tabular-nums leading-none ${
-                    isCrit ? 'text-yellow-300' : isFumble ? 'text-red-400' : t.totalText
-                  }`}
-                  style={{
-                    textShadow: isCrit
-                      ? '0 0 20px rgba(253,224,71,0.6)'
-                      : isFumble
-                      ? '0 0 20px rgba(248,113,113,0.5)'
-                      : undefined,
-                  }}
-                >
-                  {total}
-                </span>
-                {isCrit   && <span className="text-[11px] font-bold text-yellow-400 tracking-widest mt-1">CRITICAL!</span>}
-                {isFumble && <span className="text-[11px] font-bold text-red-400 tracking-widest mt-1">FUMBLE</span>}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Modifier hint */}
-        {parsed.modifier !== 0 && hasRolled && (
-          <p className={`text-center text-[11px] ${t.label} mb-4`}>
-            {modEnabled
-              ? 'Tap modifier to roll raw dice'
-              : `Raw dice only · tap modifier to add ${parsed.modifier > 0 ? '+' : ''}${parsed.modifier}`
-            }
-          </p>
-        )}
-
-        {/* Divider */}
-        <div className={`border-t ${t.divider} mb-4`} />
-
-        {/* Roll Again */}
-        <button
-          onClick={doRoll}
-          disabled={isRolling}
-          className={`
-            w-full py-2.5 rounded-xl font-bold text-sm text-white
-            border transition-all duration-150
-            ${t.btnBg}
-            ${isRolling ? 'opacity-50 cursor-not-allowed' : ''}
-          `}
-        >
-          {isRolling ? '🎲 Rolling…' : '🎲 Roll Again'}
-        </button>
+        {isRolling && !rollResult
+          ? <p className={`text-center text-sm py-4 ${t.label}`}>Rolling…</p>
+          : rollResult && (
+            <ResultPanel
+              parsed={parsed}
+              rollResult={rollResult}
+              modEnabled={modEnabled}
+              onToggleMod={() => setModEnabled(e => !e)}
+              onRollAgain={doRoll}
+              isRolling={isRolling}
+              t={t}
+            />
+          )
+        }
       </div>
     </>,
     document.body,
   )
 }
 
-// ── Context ───────────────────────────────────────────────────────────────────
+// ── Context / Provider ────────────────────────────────────────────────────────
 
 const DiceRollerContext = createContext(null)
 
 export function DiceRollerProvider({ children }) {
-  const [request, setRequest] = useState(null)
+  const diceBoxRef = useRef(null)
+  const [boxReady, setBoxReady] = useState(false)
+  const [request, setRequest]   = useState(null)
+
+  // Create the DiceBox instance once on mount
+  useEffect(() => {
+    // DiceBox needs a real DOM element as its container
+    const el = document.createElement('div')
+    el.id = 'dice-box-host'
+    el.style.cssText = 'position:fixed;inset:0;z-index:102;pointer-events:none;'
+    document.body.appendChild(el)
+
+    const box = new DiceBox(el, {
+      assetPath:        ASSET_PATH,
+      id:               'dice-canvas',
+      scale:            7,
+      gravity:          1,
+      mass:             1,
+      friction:         0.8,
+      restitution:      0,
+      angularDamping:   0.4,
+      linearDamping:    0.4,
+      spinForce:        4,
+      throwForce:       5,
+      startingHeight:   8,
+      settleTimeout:    5000,
+      offscreen:        true,
+      delay:            10,
+      enableShadows:    true,
+      lightIntensity:   1,
+    })
+
+    box.init()
+      .then(() => { diceBoxRef.current = box; setBoxReady(true) })
+      .catch(err => console.error('[DiceBox] init error:', err))
+
+    return () => {
+      box.clear?.()
+      el.remove()
+    }
+  }, [])
 
   const roll = useCallback((label, damage, theme = 'violet') => {
+    if (!boxReady) return
     setRequest({ label, damage, theme, key: Date.now() })
-  }, [])
+  }, [boxReady])
 
   const close = useCallback(() => setRequest(null), [])
 
   return (
     <DiceRollerContext.Provider value={{ roll }}>
       {children}
-      {request && (
+      {request && boxReady && (
         <DiceRollerOverlay
           key={request.key}
           label={request.label}
           damage={request.damage}
           theme={request.theme}
+          diceBoxRef={diceBoxRef}
           onClose={close}
         />
       )}
