@@ -207,6 +207,7 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
   const [modEnabled, setModEnabled] = useState(true)
   const [visible, setVisible]       = useState(false)
   const [rollKey, setRollKey]       = useState(0)
+  const isFirstRoll                 = useRef(true)
 
   useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
 
@@ -235,7 +236,10 @@ function DiceRollerOverlay({ label, damage, theme, diceBoxRef, onClose }) {
     setIsRolling(true)
     setRollResult(null)
     setModEnabled(true)
-    playRollSfx()
+    // First roll audio is played by the provider's roll() (direct user click).
+    // Subsequent Roll Again clicks call doRoll() directly, so play here.
+    if (!isFirstRoll.current) playRollSfx()
+    isFirstRoll.current = false
     diceBoxRef.current.roll(parsed.notation).catch(() => setIsRolling(false))
   }
 
@@ -359,6 +363,8 @@ export function DiceRollerProvider({ children }) {
 
   const roll = useCallback((label, damage, theme = 'violet') => {
     if (!boxReady) return
+    // Play audio here — this IS a direct user-gesture call, so autoplay is allowed.
+    playRollSfx()
     setRequest({ label, damage, theme, key: Date.now() })
   }, [boxReady])
 
