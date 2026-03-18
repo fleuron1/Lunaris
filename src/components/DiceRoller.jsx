@@ -329,18 +329,19 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        // Physics world is hardcoded at 9.5 units. scale=9 → collider ~4.5 units, fits well.
-        // Default is 5. This gives ~1.8× bigger dice visually.
-        scale:            9,
-        gravity:          1,
+        // Physics world defaults to 9.5 units — way too small for scale-50 dice (~25-unit colliders).
+        // We patched world.onscreen.js to accept `size` from config. size=55 gives a 110-unit arena.
+        size:             55,
+        scale:            50,
+        gravity:          2,
         mass:             1,
         friction:         0.8,
-        restitution:      0.5,
-        angularDamping:   0.3,
-        linearDamping:    0.3,
+        restitution:      0.1,
+        angularDamping:   0.4,
+        linearDamping:    0.4,
         spinForce:        6,
         throwForce:       5,
-        startingHeight:   8,
+        startingHeight:   12,
         settleTimeout:    5000,
         offscreen:        true,
         delay:            10,

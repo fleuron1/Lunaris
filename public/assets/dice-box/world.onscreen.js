@@ -12702,7 +12702,7 @@ const ra = {
 };
 class sa {
   constructor(e) {
-    xe(this, "size", 9.5);
+    xe(this, "size", e && e.size || 9.5);
     this.config = { ...ra, ...e }, this.create();
   }
   create(e) {
@@ -12964,7 +12964,8 @@ class da {
       enableShadows: this.config.enableShadows,
       aspect: C(this, fe).width / C(this, fe).height,
       lights: C(this, ce),
-      scene: C(this, K)
+      scene: C(this, K),
+      size: this.config.size
     })), ie(this, Ke, new aa({ scene: C(this, K) })), this.onInitComplete();
   }
   connect(e) {
