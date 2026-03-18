@@ -254,13 +254,14 @@ function DiceRollerOverlay({ label, damage, theme, onClose }) {
     // Guard against StrictMode double-fire
     if (!didRoll.current && parsed) {
       didRoll.current = true
-      _box.roll(parsed.notation).catch(() => setIsRolling(false))
+      // show() MUST be called before roll() — canvas is hidden by default
+      _box.show().roll(parsed.notation).catch(() => setIsRolling(false))
     }
 
     return () => {
       if (_box) {
         _box.onRollComplete = null
-        _box.clear?.()
+        _box.hide().clear()
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -271,12 +272,12 @@ function DiceRollerOverlay({ label, damage, theme, onClose }) {
     setRollResult(null)
     setModEnabled(true)
     playRollSfx()
-    _box.roll(parsed.notation).catch(() => setIsRolling(false))
+    _box.show().roll(parsed.notation).catch(() => setIsRolling(false))
   }
 
   function handleClose() {
     setVisible(false)
-    _box?.clear?.()
+    _box?.hide().clear()
     setTimeout(onClose, 220)
   }
 
