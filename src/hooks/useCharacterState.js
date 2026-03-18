@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ABILITIES, SPELLS, SKILLS } from '../data/annabelle.js'
 import {
   getSpellSlotMax, getMaxHp, getProfBonus, SORCERY_POINTS, maxMetamagic,
 } from '../data/sorcerer-progression.js'
+import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
 const STORAGE_KEY = 'annabelle-sheet-v2'
 
@@ -92,7 +93,35 @@ function saveState(state) {
 
 export function useCharacterState() {
   const [state, setState] = useState(loadState)
-  useEffect(() => { saveState(state) }, [state])
+  const [syncStatus, setSyncStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
+  const saveTimerRef = useRef(null)
+
+  // On mount: pull latest from cloud and merge (cloud wins over localStorage)
+  useEffect(() => {
+    loadFromCloud().then(cloudData => {
+      if (!cloudData) return
+      setState(prev => {
+        const merged = { ...prev, ...cloudData }
+        merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+        saveState(merged)
+        return merged
+      })
+    })
+  }, [])
+
+  // Save to localStorage immediately; debounce cloud save by 1.5s
+  useEffect(() => {
+    saveState(state)
+    setSyncStatus('saving')
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveToCloud(state).then(() => {
+        setSyncStatus('saved')
+        setTimeout(() => setSyncStatus('idle'), 2000)
+      }).catch(() => setSyncStatus('error'))
+    }, 1500)
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+  }, [state])
 
   const update = useCallback((patch) => setState(prev => ({ ...prev, ...patch })), [])
 
@@ -314,6 +343,8 @@ export function useCharacterState() {
     setSkillProf, addLanguage, removeLanguage,
     // Character info
     setAc, setSpeed, setCharacterName, setBackground, setNotes,
+    // Sync
+    syncStatus,
     // Derived
     maxHp: getMaxHp(state.level, conMod),
     profBonus,

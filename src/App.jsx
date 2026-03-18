@@ -14,7 +14,23 @@ const NAV_LINKS = [
   { to: '/edit',   label: 'Builder', end: false },
 ]
 
-function NavBar({ lunarPhase, level }) {
+function SyncDot({ status }) {
+  if (status === 'idle') return null
+  const styles = {
+    saving: 'bg-violet-400/60 animate-pulse',
+    saved:  'bg-emerald-400/80',
+    error:  'bg-red-400/80',
+  }
+  const labels = { saving: 'Saving…', saved: 'Saved', error: 'Sync error' }
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-violet-300/50">
+      <span className={`w-1.5 h-1.5 rounded-full ${styles[status]}`} />
+      <span>{labels[status]}</span>
+    </div>
+  )
+}
+
+function NavBar({ lunarPhase, level, syncStatus }) {
   return (
     <nav
       className="sticky top-0 z-20 border-b border-violet-900/30"
@@ -59,8 +75,9 @@ function NavBar({ lunarPhase, level }) {
           ))}
         </div>
 
-        {/* Level badge */}
-        <div className="ml-auto">
+        {/* Level badge + sync */}
+        <div className="ml-auto flex items-center gap-3">
+          <SyncDot status={syncStatus} />
           <span className="hidden sm:flex items-center gap-1.5 text-xs text-violet-300/50 bg-violet-900/20 border border-violet-800/30 px-2.5 py-1 rounded-full">
             <span className="text-violet-400/60">Lvl</span>
             <span className="font-bold text-violet-200">{level}</span>
@@ -78,7 +95,7 @@ export default function App() {
     <div className="min-h-screen relative">
       <StarField />
       <div className="relative z-10">
-        <NavBar lunarPhase={charState.lunarPhase} level={charState.level} />
+        <NavBar lunarPhase={charState.lunarPhase} level={charState.level} syncStatus={charState.syncStatus} />
         <main>
           <Routes>
             <Route path="/" element={<SheetPage {...charState} />} />
