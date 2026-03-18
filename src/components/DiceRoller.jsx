@@ -63,13 +63,18 @@ function initDiceBox() {
   el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
   document.body.appendChild(el)
 
-  // Minimal config — match the official React demo exactly.
-  // Only override assetPath and throwForce, let everything else use library defaults.
+  // scale controls visual die size. Default is 6.
+  // Going above ~8 risks dice spawning outside physics walls.
+  // We use scale=9 for larger dice that are still physics-safe.
   _box = new DiceBox({
     assetPath:  ASSET_PATH,
     container:  '#dice-box-host',
     id:         'dice-canvas',
-    throwForce: 9,
+    scale:      9,
+    throwForce: 6,
+    spinForce:  4,
+    startingHeight: 12,
+    settleTimeout: 5000,
   })
 
   _initPromise = _box.init()
