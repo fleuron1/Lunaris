@@ -319,11 +319,8 @@ export function DiceRollerProvider({ children }) {
   useEffect(() => {
     const el = document.createElement('div')
     el.id = 'dice-box-host'
-    // Size from actual screen pixels. CSS transform scales dice up visually
-    // without breaking the physics world (which is hardcoded at 9.5 units).
-    const W = window.innerWidth
-    const H = window.innerHeight
-    el.style.cssText = `position:fixed;inset:0;width:${W}px;height:${H}px;z-index:102;pointer-events:none;transform:scale(1.8);transform-origin:center center;`
+    // Simple full-viewport container — no CSS transforms (breaks WebGL).
+    el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
     document.body.appendChild(el)
 
     let box = null
@@ -332,19 +329,19 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        // scale controls physics collider size — world is only 9.5 units,
-        // so scale must stay low. Visual enlargement is handled by CSS transform.
+        // Physics world is hardcoded at 9.5 units. scale=9 → collider ~4.5 units, fits well.
+        // Default is 5. This gives ~1.8× bigger dice visually.
         scale:            9,
-        gravity:          2,
+        gravity:          1,
         mass:             1,
         friction:         0.8,
-        restitution:      0.1,
-        angularDamping:   0.4,
-        linearDamping:    0.4,
+        restitution:      0.5,
+        angularDamping:   0.3,
+        linearDamping:    0.3,
         spinForce:        6,
-        throwForce:       6,
+        throwForce:       5,
         startingHeight:   8,
-        settleTimeout:    4000,
+        settleTimeout:    5000,
         offscreen:        true,
         delay:            10,
         enableShadows:    true,
@@ -359,14 +356,7 @@ export function DiceRollerProvider({ children }) {
       el.remove()
     }
 
-    function onResize() {
-      el.style.width  = window.innerWidth  + 'px'
-      el.style.height = window.innerHeight + 'px'
-    }
-    window.addEventListener('resize', onResize)
-
     return () => {
-      window.removeEventListener('resize', onResize)
       box?.clear?.()
       el.remove()
     }
