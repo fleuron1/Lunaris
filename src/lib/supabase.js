@@ -5,14 +5,12 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-const ROW_ID = 'annabelle'
-
-export async function loadFromCloud() {
+export async function loadFromCloud(characterId) {
   try {
     const { data, error } = await supabase
       .from('character_sheet')
       .select('data')
-      .eq('id', ROW_ID)
+      .eq('id', characterId)
       .single()
     if (error || !data?.data || Object.keys(data.data).length === 0) return null
     return data.data
@@ -21,11 +19,11 @@ export async function loadFromCloud() {
   }
 }
 
-export async function saveToCloud(state) {
+export async function saveToCloud(characterId, state) {
   try {
     await supabase
       .from('character_sheet')
-      .upsert({ id: ROW_ID, data: state, updated_at: new Date().toISOString() })
+      .upsert({ id: characterId, data: state, updated_at: new Date().toISOString() })
   } catch {
     // fail silently — localStorage is the fallback
   }

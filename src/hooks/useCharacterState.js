@@ -5,7 +5,7 @@ import {
 } from '../data/sorcerer-progression.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
-const STORAGE_KEY = 'annabelle-sheet-v2'
+const LEGACY_KEY = 'annabelle-sheet-v2' // migration: old single-character key
 
 // Lunar bonus spells are always prepared by the subclass — exclude from managed known spells
 const DEFAULT_KNOWN_SPELLS = SPELLS.filter(s => s.level !== 'C' && !s.lunar).map(s => s.name)
@@ -73,13 +73,22 @@ const LUNAR_SPELL_NAMES = new Set(
   ['Cure Wounds', 'Silent Image', 'Shield', 'Moonbeam', 'Invisibility', 'Lesser Restoration']
 )
 
-function loadState() {
+function storageKey(characterId) {
+  return `character-${characterId}-v2`
+}
+
+function loadState(characterId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const key = storageKey(characterId)
+    let raw = localStorage.getItem(key)
+    // One-time migration: copy old annabelle-sheet-v2 → character-annabelle-v2
+    if (!raw && characterId === 'annabelle') {
+      raw = localStorage.getItem(LEGACY_KEY)
+      if (raw) localStorage.setItem(key, raw)
+    }
     if (!raw) return buildDefaults()
     const saved = JSON.parse(raw)
     const merged = { ...buildDefaults(saved.level || 4, saved.abilityScores || DEFAULT_ABILITIES), ...saved }
-    // Strip any lunar bonus spells that ended up in the managed known spells list
     merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
     return merged
   } catch {
@@ -87,35 +96,35 @@ function loadState() {
   }
 }
 
-function saveState(state) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch {}
+function saveState(characterId, state) {
+  try { localStorage.setItem(storageKey(characterId), JSON.stringify(state)) } catch {}
 }
 
-export function useCharacterState() {
-  const [state, setState] = useState(loadState)
+export function useCharacterState(characterId = 'annabelle') {
+  const [state, setState] = useState(() => loadState(characterId))
   const [syncStatus, setSyncStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
   const saveTimerRef = useRef(null)
 
   // On mount: pull latest from cloud and merge (cloud wins over localStorage)
   useEffect(() => {
-    loadFromCloud().then(cloudData => {
+    loadFromCloud(characterId).then(cloudData => {
       if (!cloudData) return
       setState(prev => {
         const merged = { ...prev, ...cloudData }
         merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
-        saveState(merged)
+        saveState(characterId, merged)
         return merged
       })
     })
-  }, [])
+  }, [characterId])
 
   // Save to localStorage immediately; debounce cloud save by 1.5s
   useEffect(() => {
-    saveState(state)
+    saveState(characterId, state)
     setSyncStatus('saving')
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      saveToCloud(state).then(() => {
+      saveToCloud(characterId, state).then(() => {
         setSyncStatus('saved')
         setTimeout(() => setSyncStatus('idle'), 2000)
       }).catch(() => setSyncStatus('error'))
