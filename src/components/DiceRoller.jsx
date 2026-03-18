@@ -63,25 +63,13 @@ function initDiceBox() {
   el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
   document.body.appendChild(el)
 
+  // Minimal config — match the official React demo exactly.
+  // Only override assetPath and throwForce, let everything else use library defaults.
   _box = new DiceBox({
-    assetPath:      ASSET_PATH,
-    container:      '#dice-box-host',
-    id:             'dice-canvas',
-    scale:          6,
-    gravity:        2,
-    mass:           1,
-    friction:       0.8,
-    restitution:    0.2,
-    angularDamping: 0.4,
-    linearDamping:  0.5,
-    spinForce:      8,
-    throwForce:     9,
-    startingHeight: 10,
-    settleTimeout:  6000,
-    offscreen:      false,
-    delay:          10,
-    enableShadows:  true,
-    lightIntensity: 1,
+    assetPath:  ASSET_PATH,
+    container:  '#dice-box-host',
+    id:         'dice-canvas',
+    throwForce: 9,
   })
 
   _initPromise = _box.init()
