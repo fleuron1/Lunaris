@@ -34,6 +34,27 @@
   50% { transform: translateY(-3px); }
 }
 
+@keyframes snowfall-l {
+  0%   { transform: translateY(-20px) translateX(0px); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.7; }
+  100% { transform: translateY(110vh) translateX(-35px); opacity: 0; }
+}
+
+@keyframes snowfall-r {
+  0%   { transform: translateY(-20px) translateX(0px); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.7; }
+  100% { transform: translateY(110vh) translateX(35px); opacity: 0; }
+}
+
+@keyframes snowfall-s {
+  0%   { transform: translateY(-20px) translateX(0px); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.6; }
+  100% { transform: translateY(110vh) translateX(8px); opacity: 0; }
+}
+
 @layer utilities {
   .pip {
     @apply w-5 h-5 rounded-full border-2 cursor-pointer transition-all duration-200;

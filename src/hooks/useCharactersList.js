@@ -9,6 +9,15 @@ const DEFAULT_CHARACTERS = [
     race: 'Warforged',
     characterClass: 'Sorcerer (Lunar)',
     accent: 'violet',
+    sheetType: 'sorcerer',
+  },
+  {
+    id: 'tonti',
+    name: 'Tonti of Darkgate',
+    race: 'Tabaxi',
+    characterClass: 'Echo Knight Fighter',
+    accent: 'rose',
+    sheetType: 'fighter',
   },
 ]
 
@@ -16,7 +25,13 @@ function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_CHARACTERS
-    return JSON.parse(raw)
+    const saved = JSON.parse(raw)
+    // Ensure all default characters are present (migration)
+    const merged = [...saved]
+    for (const def of DEFAULT_CHARACTERS) {
+      if (!merged.find(c => c.id === def.id)) merged.push(def)
+    }
+    return merged
   } catch {
     return DEFAULT_CHARACTERS
   }
