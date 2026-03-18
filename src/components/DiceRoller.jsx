@@ -319,10 +319,11 @@ export function DiceRollerProvider({ children }) {
   useEffect(() => {
     const el = document.createElement('div')
     el.id = 'dice-box-host'
-    // Size the canvas to exact screen pixels so the physics world matches the viewport.
+    // Size from actual screen pixels. CSS transform scales dice up visually
+    // without breaking the physics world (which is hardcoded at 9.5 units).
     const W = window.innerWidth
     const H = window.innerHeight
-    el.style.cssText = `position:fixed;inset:0;width:${W}px;height:${H}px;z-index:102;pointer-events:none;`
+    el.style.cssText = `position:fixed;inset:0;width:${W}px;height:${H}px;z-index:102;pointer-events:none;transform:scale(1.8);transform-origin:center center;`
     document.body.appendChild(el)
 
     let box = null
@@ -331,7 +332,9 @@ export function DiceRollerProvider({ children }) {
         assetPath:        ASSET_PATH,
         container:        '#dice-box-host',
         id:               'dice-canvas',
-        scale:            50,
+        // scale controls physics collider size — world is only 9.5 units,
+        // so scale must stay low. Visual enlargement is handled by CSS transform.
+        scale:            9,
         gravity:          2,
         mass:             1,
         friction:         0.8,
@@ -356,7 +359,6 @@ export function DiceRollerProvider({ children }) {
       el.remove()
     }
 
-    // Keep the canvas in sync if the user resizes the window
     function onResize() {
       el.style.width  = window.innerWidth  + 'px'
       el.style.height = window.innerHeight + 'px'
