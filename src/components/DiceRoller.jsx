@@ -63,18 +63,19 @@ function initDiceBox() {
   el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:102;pointer-events:none;'
   document.body.appendChild(el)
 
-  // scale controls visual die size. Default is 6.
-  // Going above ~8 risks dice spawning outside physics walls.
-  // We use scale=9 for larger dice that are still physics-safe.
+  // scale=50 for big dice. Camera patched in world.onscreen.js (y=120, fov=0.50)
+  // to see the larger world. size=30 gives a 60-unit physics arena.
   _box = new DiceBox({
-    assetPath:  ASSET_PATH,
-    container:  '#dice-box-host',
-    id:         'dice-canvas',
-    scale:      9,
-    throwForce: 6,
-    spinForce:  4,
-    startingHeight: 12,
-    settleTimeout: 5000,
+    assetPath:      ASSET_PATH,
+    container:      '#dice-box-host',
+    id:             'dice-canvas',
+    scale:          50,
+    size:           30,
+    throwForce:     5,
+    spinForce:      4,
+    startingHeight: 15,
+    settleTimeout:  5000,
+    offscreen:      false,
   })
 
   _initPromise = _box.init()
