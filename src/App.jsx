@@ -335,6 +335,8 @@ function FighterApp() {
                 addLanguage={state.addLanguage}
                 removeLanguage={state.removeLanguage}
                 setSkillProf={state.setSkillProf}
+                feats={state.feats}
+                toggleFeat={state.toggleFeat}
               />
             }
           />

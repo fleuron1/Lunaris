@@ -249,7 +249,22 @@ export default function SheetPage({
                   {(weapons || []).map(w => (
                     <tr key={w.id} className="border-b border-violet-900/20 hover:bg-violet-900/10 transition-colors">
                       <td className="py-2.5 font-medium text-slate-200">{w.name}</td>
-                      <td className="py-2.5 text-center font-mono font-bold text-amber-300">{w.atkBonus}</td>
+                      <td className="py-2.5 text-center">
+                        {w.atkBonus ? (() => {
+                          const n = parseInt((w.atkBonus || '').replace(/^\+/, ''), 10)
+                          const notation = !isNaN(n) ? `1d20${n >= 0 ? '+' : ''}${n}` : null
+                          return notation ? (
+                            <button
+                              onClick={() => roll(w.name + ' to Hit', notation, 'violet')}
+                              title="Click to roll to hit"
+                              className="font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors cursor-pointer group"
+                            >
+                              {w.atkBonus}
+                              <span className="ml-1 text-[10px] text-amber-700/40 group-hover:text-amber-400/60 transition-colors">🎲</span>
+                            </button>
+                          ) : <span className="font-mono font-bold text-amber-300">{w.atkBonus}</span>
+                        })() : <span className="text-slate-600">—</span>}
+                      </td>
                       <td
                         className="py-2.5 text-violet-300/80 cursor-pointer hover:text-violet-200 group transition-colors"
                         onClick={() => roll(w.name, w.damage, 'violet')}

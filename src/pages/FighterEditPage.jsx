@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { SKILLS } from '../data/tonti.js'
 import { getProfBonus } from '../data/fighter-progression.js'
+import featsData from '../data/feats.json'
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 const ABILITY_LABELS = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }
@@ -26,17 +27,17 @@ function SH({ children }) {
   )
 }
 
-const TABS = ['Character', 'Stats', 'Inventory', 'Skills & Languages']
+const TABS = ['Character', 'Stats', 'Inventory', 'Skills & Languages', 'Feats']
 
 export default function FighterEditPage({
   level, xp, abilityScores, ac, speed,
   characterName, background, notes,
-  weapons, equipment, languages, skillProfs,
+  weapons, equipment, languages, skillProfs, feats,
   setLevel, setXp, setAbilityScore, setAc, setSpeed,
   setCharacterName, setBackground, setNotes,
   addWeapon, updateWeapon, removeWeapon,
   addEquipment, updateEquipment, removeEquipment,
-  addLanguage, removeLanguage, setSkillProf,
+  addLanguage, removeLanguage, setSkillProf, toggleFeat,
   profBonus,
 }) {
   const [tab, setTab] = useState('Character')
@@ -83,6 +84,9 @@ export default function FighterEditPage({
           abilityScores={abilityScores} profBonus={profBonus} skillProfs={skillProfs} setSkillProf={setSkillProf}
           languages={languages} addLanguage={addLanguage} removeLanguage={removeLanguage}
         />
+      )}
+      {tab === 'Feats' && (
+        <FeatsTab feats={feats} toggleFeat={toggleFeat} />
       )}
     </div>
   )
@@ -363,27 +367,36 @@ function SkillsTab({ abilityScores, profBonus, skillProfs, setSkillProf, languag
       {/* Skills */}
       <Card className="p-5">
         <SH>Skill Proficiencies</SH>
+        <div className="flex items-center gap-3 mb-3 text-[10px] text-pink-300/40">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#030b18]/80 border border-pink-950/40 inline-block" /> None</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-pink-500 border-pink-400 inline-block" /> Prof</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-500 border-amber-400 inline-block" /> Expert</span>
+        </div>
         <div className="space-y-1">
           {SKILLS.map(skill => {
             const prof = skillProfs?.[skill.name]
             const score = abilityScores?.[skill.ability] ?? 10
             const total = mod(score) + (prof === 'expert' ? profBonus * 2 : prof === 'proficient' ? profBonus : 0)
+            function cycle() {
+              const next = prof === 'expert' ? undefined : prof === 'proficient' ? 'expert' : 'proficient'
+              setSkillProf(skill.name, next)
+            }
             return (
               <div key={skill.name} className="flex items-center gap-2">
+                <button
+                  onClick={cycle}
+                  title={prof === 'expert' ? 'Expert · click to clear' : prof === 'proficient' ? 'Proficient · click for Expert' : 'None · click for Proficient'}
+                  className={`w-4 h-4 rounded-full border flex-shrink-0 transition-all ${
+                    prof === 'expert'      ? 'bg-amber-500 border-amber-400 shadow-[0_0_4px_rgba(245,158,11,0.5)]'
+                    : prof === 'proficient' ? 'bg-pink-500 border-pink-400 shadow-[0_0_4px_rgba(236,72,153,0.4)]'
+                    : 'bg-[#030b18]/80 border-pink-950/40 hover:border-pink-700/50'
+                  }`}
+                />
                 <span className="text-xs text-slate-300 flex-1">{skill.name}</span>
                 <span className="text-[10px] text-pink-300/30 w-7">{ABILITY_LABELS[skill.ability]}</span>
-                <span className={`text-xs font-bold tabular-nums w-6 text-right ${prof ? 'text-pink-400' : 'text-slate-500'}`}>
+                <span className={`text-xs font-bold tabular-nums w-8 text-right ${prof ? 'text-pink-300' : 'text-slate-500'}`}>
                   {fmtMod(total)}
                 </span>
-                <select
-                  value={prof ?? ''}
-                  onChange={e => setSkillProf(skill.name, e.target.value || undefined)}
-                  className="bg-[#030b18] border border-pink-950/40 rounded px-1.5 py-0.5 text-xs text-slate-300 focus:outline-none focus:border-pink-700/50"
-                >
-                  <option value="">—</option>
-                  <option value="proficient">Proficient</option>
-                  <option value="expert">Expert</option>
-                </select>
               </div>
             )
           })}
@@ -416,6 +429,83 @@ function SkillsTab({ abilityScores, profBonus, skillProfs, setSkillProf, languag
           </button>
         </form>
       </Card>
+    </div>
+  )
+}
+
+// ── Feats Tab ─────────────────────────────────────────────────────────────────
+
+function FeatsTab({ feats = [], toggleFeat }) {
+  const [query, setQuery] = useState('')
+
+  const results = useMemo(() => {
+    if (!query.trim()) return []
+    const q = query.toLowerCase()
+    return featsData.filter(f =>
+      f.name.toLowerCase().includes(q) && !feats.includes(f.name)
+    ).slice(0, 8)
+  }, [query, feats])
+
+  const chosenFeats = useMemo(() =>
+    featsData.filter(f => feats?.includes(f.name)),
+  [feats])
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5">
+        <SH>Add Feat</SH>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search feats…"
+          className="w-full bg-[#030b18] border border-pink-950/40 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-pink-700/50 placeholder-slate-700 mb-3"
+        />
+        {results.length > 0 && (
+          <ul className="space-y-1">
+            {results.map(f => (
+              <li key={f.name}>
+                <button
+                  onClick={() => { toggleFeat(f.name); setQuery('') }}
+                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-pink-950/30 transition-colors group"
+                >
+                  <span className="text-sm text-slate-200 group-hover:text-white">{f.name}</span>
+                  {f.prerequisite && (
+                    <span className="ml-2 text-[10px] text-pink-300/40">{f.prerequisite}</span>
+                  )}
+                  <span className="ml-auto float-right text-[10px] text-pink-700/50 group-hover:text-pink-400/70">+ add</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {query.trim() && results.length === 0 && (
+          <p className="text-xs text-pink-300/30 text-center py-2">No matching feats</p>
+        )}
+      </Card>
+
+      {chosenFeats.length > 0 && (
+        <Card className="p-5">
+          <SH>Known Feats</SH>
+          <div className="space-y-3">
+            {chosenFeats.map(f => (
+              <div key={f.name} className="border border-pink-950/40 rounded-xl p-3 bg-[#030b18]/60">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-sm font-bold text-pink-200">{f.name}</p>
+                  <button
+                    onClick={() => toggleFeat(f.name)}
+                    className="text-pink-700/50 hover:text-rose-400 transition-colors text-sm flex-shrink-0"
+                    title="Remove feat"
+                  >✕</button>
+                </div>
+                {f.prerequisite && (
+                  <p className="text-[10px] text-pink-300/40 mb-1.5">{f.prerequisite}</p>
+                )}
+                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{f.description}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

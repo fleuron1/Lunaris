@@ -489,7 +489,22 @@ function WeaponsSection({ weapons }) {
             {(weapons || []).map(w => (
               <tr key={w.id} className="border-b border-pink-950/30 hover:bg-pink-950/10 transition-colors">
                 <td className="py-2.5 font-medium text-slate-200">{w.name}</td>
-                <td className="py-2.5 text-center font-mono font-bold text-pink-300">{w.atkBonus}</td>
+                <td className="py-2.5 text-center">
+                  {w.atkBonus ? (() => {
+                    const n = parseInt((w.atkBonus || '').replace(/^\+/, ''), 10)
+                    const notation = !isNaN(n) ? `1d20${n >= 0 ? '+' : ''}${n}` : null
+                    return notation ? (
+                      <button
+                        onClick={() => roll(w.name + ' to Hit', notation, 'pink')}
+                        title="Click to roll to hit"
+                        className="font-mono font-bold text-pink-300 hover:text-pink-100 transition-colors cursor-pointer group"
+                      >
+                        {w.atkBonus}
+                        <span className="ml-1 text-[10px] text-pink-600/40 group-hover:text-pink-400/60 transition-colors">🎲</span>
+                      </button>
+                    ) : <span className="font-mono font-bold text-pink-300">{w.atkBonus}</span>
+                  })() : <span className="text-slate-600">—</span>}
+                </td>
                 <td
                   className="py-2.5 text-pink-300/80 cursor-pointer hover:text-pink-200 group transition-colors"
                   onClick={() => roll(w.name, w.damage, 'pink')}

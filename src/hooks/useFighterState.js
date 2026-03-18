@@ -60,6 +60,7 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
       { id: 'pack',     name: "Explorer's Pack",     description: 'Backpack, bedroll, mess kit, tinderbox, 10 torches, 10 days rations, waterskin, 50 ft rope', isMagic: false },
       { id: 'gold',     name: '45 GP',               description: '',                                                           isMagic: false },
     ],
+    feats: [],
   }
 }
 
@@ -232,6 +233,16 @@ export function useFighterState(characterId = 'tonti') {
   function setBackground(n) { update({ background: n }) }
   function setNotes(n) { update({ notes: n }) }
 
+  // ── Feats ─────────────────────────────────────────────────
+  function toggleFeat(name) {
+    setState(prev => ({
+      ...prev,
+      feats: prev.feats?.includes(name)
+        ? prev.feats.filter(f => f !== name)
+        : [...(prev.feats || []), name],
+    }))
+  }
+
   // ── Derived ──────────────────────────────────────────────
   const conMod = Math.floor((state.abilityScores.con - 10) / 2)
   const profBonus = getProfBonus(state.level)
@@ -250,6 +261,7 @@ export function useFighterState(characterId = 'tonti') {
     addEquipment, updateEquipment, removeEquipment,
     setSkillProf, addLanguage, removeLanguage,
     setAc, setSpeed, setCharacterName, setBackground, setNotes,
+    toggleFeat,
     // Sync
     syncStatus,
     // Derived

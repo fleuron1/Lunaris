@@ -272,7 +272,7 @@ export function DiceRollerProvider({ children }) {
     try {
       box = new DiceBox({
         assetPath:        ASSET_PATH,
-        container:        el,
+        container:        '#dice-box-host',
         id:               'dice-canvas',
         scale:            7,
         gravity:          1,
