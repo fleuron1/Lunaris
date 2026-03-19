@@ -10,6 +10,7 @@ import DeathSaves from '../components/DeathSaves.jsx'
 import LunarPhaseSwitcher from '../components/LunarPhaseSwitcher.jsx'
 import { CLASS_FEATURES, SPECIES_TRAITS } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
+import CurrencyTracker from '../components/CurrencyTracker.jsx'
 
 function StatBadge({ label, value, sub }) {
   return (
@@ -41,6 +42,7 @@ export default function SheetPage({
   weapons, equipment, feats, languages, skillProfs,
   ac, speed, characterName, background,
   spellSaveDC, spellAttackBonus, chosenMetamagic,
+  currency, setCurrency,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
@@ -310,23 +312,28 @@ export default function SheetPage({
 
           {/* Equipment + Languages */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="card p-4">
-              <p className="section-header">Equipment</p>
-              <ul className="space-y-1.5">
-                {(equipment || []).map(item => (
-                  <li key={item.id} className="text-sm text-slate-300 flex gap-2 items-start">
-                    <span className="text-violet-500/50 mt-0.5 text-xs flex-shrink-0">
-                      {item.isMagic ? '✨' : '✦'}
-                    </span>
-                    <span>
-                      <span className={item.isMagic ? 'text-amber-300/90' : ''}>{item.name}</span>
-                      {item.description && (
-                        <span className="text-slate-500 text-xs block">{item.description}</span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            <div className="card p-4 space-y-4">
+              <div>
+                <p className="section-header">Equipment</p>
+                <ul className="space-y-1.5">
+                  {(equipment || []).map(item => (
+                    <li key={item.id} className="text-sm text-slate-300 flex gap-2 items-start">
+                      <span className="text-violet-500/50 mt-0.5 text-xs flex-shrink-0">
+                        {item.isMagic ? '✨' : '✦'}
+                      </span>
+                      <span>
+                        <span className={item.isMagic ? 'text-amber-300/90' : ''}>{item.name}</span>
+                        {item.description && (
+                          <span className="text-slate-500 text-xs block">{item.description}</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="border-t border-violet-900/30 pt-3">
+                <CurrencyTracker currency={currency} setCurrency={setCurrency} theme="violet" />
+              </div>
             </div>
 
             <div className="card p-4 space-y-4">

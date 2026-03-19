@@ -66,6 +66,7 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
       { id: 'gold', name: '10 GP', description: '', isMagic: false },
     ],
     languages: ['Common', 'Elvish', 'Draconic', 'Thieves Cant', 'Undercommon'],
+    currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
   }
 }
 
@@ -328,6 +329,9 @@ export function useCharacterState(characterId = 'annabelle') {
   function setCharacterName(n) { update({ characterName: n }) }
   function setBackground(n) { update({ background: n }) }
   function setNotes(n) { update({ notes: n }) }
+  function setCurrency(type, value) {
+    setState(prev => ({ ...prev, currency: { ...prev.currency, [type]: value } }))
+  }
 
   // ── Derived values ────────────────────────────────────────
   const conMod = Math.floor((state.abilityScores.con - 10) / 2)
@@ -351,7 +355,7 @@ export function useCharacterState(characterId = 'annabelle') {
     // Skills & languages
     setSkillProf, addLanguage, removeLanguage,
     // Character info
-    setAc, setSpeed, setCharacterName, setBackground, setNotes,
+    setAc, setSpeed, setCharacterName, setBackground, setNotes, setCurrency,
     // Sync
     syncStatus,
     // Derived

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ABILITIES, SKILLS, CLASS_FEATURES, SPECIES_TRAITS, SAVE_PROFS, PROFICIENCIES } from '../data/tonti.js'
 import { useDiceRoller } from '../components/DiceRoller.jsx'
+import CurrencyTracker from '../components/CurrencyTracker.jsx'
 
 function mod(score) { return Math.floor((score - 10) / 2) }
 function fmtMod(n) { return n >= 0 ? `+${n}` : `${n}` }
@@ -525,25 +526,30 @@ function WeaponsSection({ weapons }) {
 
 // ── Equipment ─────────────────────────────────────────────────────────────────
 
-function EquipmentSection({ equipment }) {
+function EquipmentSection({ equipment, currency, setCurrency }) {
   return (
-    <Card className="p-4">
-      <SH>Equipment</SH>
-      <ul className="space-y-1.5">
-        {(equipment || []).map(item => (
-          <li key={item.id} className="text-sm text-slate-300 flex gap-2 items-start">
-            <span className="text-pink-600/40 mt-0.5 text-xs flex-shrink-0">
-              {item.isMagic ? '✨' : '❄'}
-            </span>
-            <span>
-              <span className={item.isMagic ? 'text-pink-300/90' : ''}>{item.name}</span>
-              {item.description && (
-                <span className="text-slate-500 text-xs block">{item.description}</span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+    <Card className="p-4 space-y-4">
+      <div>
+        <SH>Equipment</SH>
+        <ul className="space-y-1.5">
+          {(equipment || []).map(item => (
+            <li key={item.id} className="text-sm text-slate-300 flex gap-2 items-start">
+              <span className="text-pink-600/40 mt-0.5 text-xs flex-shrink-0">
+                {item.isMagic ? '✨' : '❄'}
+              </span>
+              <span>
+                <span className={item.isMagic ? 'text-pink-300/90' : ''}>{item.name}</span>
+                {item.description && (
+                  <span className="text-slate-500 text-xs block">{item.description}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="border-t border-pink-900/30 pt-3">
+        <CurrencyTracker currency={currency} setCurrency={setCurrency} theme="pink" />
+      </div>
     </Card>
   )
 }
@@ -598,6 +604,7 @@ export default function TontiSheetPage({
   shortRest, longRest,
   characterName, background, notes, setNotes,
   skillProfs, languages, weapons, equipment,
+  currency, setCurrency,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
 
@@ -747,7 +754,7 @@ export default function TontiSheetPage({
 
           {/* Equipment + Languages */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <EquipmentSection equipment={equipment} />
+            <EquipmentSection equipment={equipment} currency={currency} setCurrency={setCurrency} />
             <LanguagesSection languages={languages} />
           </div>
 

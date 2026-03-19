@@ -46,6 +46,7 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
     notes: '',
     skillProfs: { ...DEFAULT_SKILL_PROFS },
     languages: ['Eskudan', 'Common'],
+    currency: { cp: 0, sp: 0, gp: 45, pp: 0 },
     weapons: [
       { id: 'scimitar',   name: 'Scimitar',          atkBonus: '+6', damage: '1d6+4 slashing',  notes: 'Finesse, Light' },
       { id: 'crossbow',   name: 'Light Crossbow',     atkBonus: '+6', damage: '1d8+4 piercing',  notes: 'Ranged 80/320 ft, Ammo' },
@@ -232,6 +233,9 @@ export function useFighterState(characterId = 'tonti') {
   function setCharacterName(n) { update({ characterName: n }) }
   function setBackground(n) { update({ background: n }) }
   function setNotes(n) { update({ notes: n }) }
+  function setCurrency(type, value) {
+    setState(prev => ({ ...prev, currency: { ...prev.currency, [type]: value } }))
+  }
 
   // ── Feats ─────────────────────────────────────────────────
   function toggleFeat(name) {
@@ -260,7 +264,7 @@ export function useFighterState(characterId = 'tonti') {
     addWeapon, updateWeapon, removeWeapon,
     addEquipment, updateEquipment, removeEquipment,
     setSkillProf, addLanguage, removeLanguage,
-    setAc, setSpeed, setCharacterName, setBackground, setNotes,
+    setAc, setSpeed, setCharacterName, setBackground, setNotes, setCurrency,
     toggleFeat,
     // Sync
     syncStatus,
