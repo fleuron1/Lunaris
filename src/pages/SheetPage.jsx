@@ -37,7 +37,7 @@ export default function SheetPage({
   level, profBonus, abilityScores,
   adjustHp, setTempHp, toggleDeathSave, resetDeathSaves,
   toggleSpellSlot, adjustSorceryPoints, setLunarPhase,
-  toggleInspiration, adjustHitDice, shortRest, longRest,
+  toggleInspiration, adjustHitDice, rollHitDie, shortRest, longRest,
   // State-driven fields
   weapons, equipment, feats, languages, skillProfs,
   ac, speed, characterName, background,
@@ -164,7 +164,14 @@ export default function SheetPage({
               maxSorceryPoints={maxSorceryPoints}
               adjustSorceryPoints={adjustSorceryPoints}
             />
-            <HitDice hitDiceSpent={hitDiceSpent} adjustHitDice={adjustHitDice} />
+            <HitDice
+              level={level}
+              hitDiceSpent={hitDiceSpent}
+              hitDiceType={6}
+              conMod={Math.floor((abilityScores.con - 10) / 2)}
+              rollHitDie={rollHitDie}
+              theme="violet"
+            />
           </div>
 
           {/* Death Saves */}

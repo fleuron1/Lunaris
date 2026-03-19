@@ -142,6 +142,26 @@ export function useFighterState(characterId = 'tonti') {
     }))
   }
 
+  function rollHitDie() {
+    const { hitDiceSpent, level, abilityScores, currentHp } = state
+    if (hitDiceSpent >= level) return null
+    const conMod = Math.floor((abilityScores.con - 10) / 2)
+    const maxHp  = level === 4 && abilityScores.con === 16 ? 44 : getMaxHp(level, conMod)
+    const die    = Math.floor(Math.random() * 10) + 1  // d10 fighter
+    const heal   = Math.max(1, die + conMod)
+    const total  = Math.min(maxHp - currentHp, heal)
+    setState(prev => {
+      const pConMod = Math.floor((prev.abilityScores.con - 10) / 2)
+      const pMax    = prev.level === 4 && prev.abilityScores.con === 16 ? 44 : getMaxHp(prev.level, pConMod)
+      return {
+        ...prev,
+        hitDiceSpent: prev.hitDiceSpent + 1,
+        currentHp:    Math.min(pMax, prev.currentHp + heal),
+      }
+    })
+    return { die, conMod, total }
+  }
+
   // ── Fighter resources ────────────────────────────────────
   function toggleSecondWind() { update({ secondWindUsed: !state.secondWindUsed }) }
   function toggleActionSurge() { update({ actionSurgeUsed: !state.actionSurgeUsed }) }
@@ -256,7 +276,7 @@ export function useFighterState(characterId = 'tonti') {
   return {
     ...state,
     // Actions
-    adjustHp, setTempHp, toggleDeathSave, resetDeathSaves, adjustHitDice,
+    adjustHp, setTempHp, toggleDeathSave, resetDeathSaves, adjustHitDice, rollHitDie,
     toggleSecondWind, toggleActionSurge, toggleAmbush, toggleManifestEcho,
     useUnleashIncarnation, restoreUnleashIncarnation, toggleFelineAgility,
     toggleInspiration, shortRest, longRest,

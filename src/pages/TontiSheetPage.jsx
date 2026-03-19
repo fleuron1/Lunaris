@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ABILITIES, SKILLS, CLASS_FEATURES, SPECIES_TRAITS, SAVE_PROFS, PROFICIENCIES } from '../data/tonti.js'
 import { useDiceRoller } from '../components/DiceRoller.jsx'
 import CurrencyTracker from '../components/CurrencyTracker.jsx'
+import HitDice from '../components/HitDice.jsx'
 
 function mod(score) { return Math.floor((score - 10) / 2) }
 function fmtMod(n) { return n >= 0 ? `+${n}` : `${n}` }
@@ -604,6 +605,7 @@ export default function TontiSheetPage({
   shortRest, longRest,
   characterName, background, notes, setNotes,
   skillProfs, languages, weapons, equipment,
+  rollHitDie,
   currency, setCurrency,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
@@ -691,10 +693,13 @@ export default function TontiSheetPage({
               adjustHp={adjustHp}
               setTempHp={setTempHp}
             />
-            <HitDiceSection
-              hitDiceSpent={hitDiceSpent}
-              adjustHitDice={adjustHitDice}
+            <HitDice
               level={level}
+              hitDiceSpent={hitDiceSpent}
+              hitDiceType={10}
+              conMod={Math.floor(((abilityScores?.con ?? 16) - 10) / 2)}
+              rollHitDie={rollHitDie}
+              theme="pink"
             />
           </div>
 

@@ -189,6 +189,22 @@ export function useCharacterState(characterId = 'annabelle') {
     }))
   }
 
+  function rollHitDie() {
+    const { hitDiceSpent, level, abilityScores, currentHp } = state
+    if (hitDiceSpent >= level) return null
+    const conMod = Math.floor((abilityScores.con - 10) / 2)
+    const maxHp  = getMaxHp(level, conMod)
+    const die    = Math.floor(Math.random() * 6) + 1  // d6 sorcerer
+    const heal   = Math.max(1, die + conMod)
+    const total  = Math.min(maxHp - currentHp, heal)
+    setState(prev => ({
+      ...prev,
+      hitDiceSpent: prev.hitDiceSpent + 1,
+      currentHp:    Math.min(maxHp, prev.currentHp + heal),
+    }))
+    return { die, conMod, total }
+  }
+
   function castSpell(level) {
     if (!level || level === 'C') return
     setState(prev => {
@@ -344,7 +360,7 @@ export function useCharacterState(characterId = 'annabelle') {
     adjustHp, setTempHp, toggleDeathSave, resetDeathSaves,
     toggleSpellSlot, castSpell, adjustSorceryPoints,
     setLunarPhase, toggleInspiration,
-    setConcentration, adjustHitDice,
+    setConcentration, adjustHitDice, rollHitDie,
     shortRest, longRest,
     // Advancement
     setLevel, setAbilityScore, toggleKnownSpell, resetSpells, toggleMetamagic, setXp,
