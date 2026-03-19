@@ -116,13 +116,16 @@ function parseDamage(notation) {
   const cleaned = (notation || '').trim()
   const match = cleaned.match(/^(\d+)d(\d+)([+-]\d+)?(?:\s+(.+))?$/i)
   if (!match) return null
+  const modifier = match[3] ? parseInt(match[3], 10) : 0
+  // Omit +0 from notation — dice-box rejects it as invalid
+  const modStr = modifier !== 0 ? (modifier > 0 ? `+${modifier}` : `${modifier}`) : ''
   return {
     count:      parseInt(match[1], 10),
     sides:      parseInt(match[2], 10),
-    modifier:   match[3] ? parseInt(match[3], 10) : 0,
+    modifier,
     damageType: match[4] ? match[4].trim() : '',
     raw:        cleaned,
-    notation:   `${match[1]}d${match[2]}${match[3] || ''}`,
+    notation:   `${match[1]}d${match[2]}${modStr}`,
   }
 }
 

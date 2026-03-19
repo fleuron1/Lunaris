@@ -10,6 +10,7 @@ import FighterEditPage from './pages/FighterEditPage.jsx'
 import CharactersPage from './pages/CharactersPage.jsx'
 import StarField from './components/StarField.jsx'
 import SnowField from './components/SnowField.jsx'
+import CatPaws from './components/CatPaws.jsx'
 import { LUNAR_PHASES } from './data/annabelle.js'
 
 const PHASE_ICONS = { full: '🌕', new: '🌑', crescent: '🌙' }
@@ -291,6 +292,7 @@ function FighterApp() {
   return (
     <>
       <SnowField />
+      <CatPaws />
       <div className="relative z-10">
       <FighterNavBar
         characterId={characterId}
