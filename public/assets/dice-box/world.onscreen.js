@@ -843,7 +843,7 @@ u([
 function Ei(f) {
   const { scene: e } = f;
   let t;
-  const i = 30;
+  const i = 18;
   return t = new j("TargetCamera1", new M(0, i, 0), e), t.fov = 0.40, t.minZ = 1, t.maxZ = i + 10, t.setTarget(M.Zero()), t;
 }
 class D extends He {
