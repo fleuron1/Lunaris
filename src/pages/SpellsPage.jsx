@@ -45,9 +45,19 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
   const isCantrip = spell.level === 'C'
   const isLunar = !!spell.lunar
   const isActivePhase = spell.lunar === lunarPhase
-  const slotData = !isCantrip ? spellSlots?.[spell.level] : null
-  const slotsLeft = slotData ? slotData.total - slotData.expended : 0
+  const [selectedSlot, setSelectedSlot] = useState(isCantrip ? null : spell.level)
+
+  // Build list of slot levels >= base level that exist
+  const availableSlotLevels = isCantrip ? [] : [1,2,3,4,5,6,7,8,9].filter(lvl => {
+    if (lvl < spell.level) return false
+    const s = spellSlots?.[lvl]
+    return s && s.total > 0
+  })
+
+  const selectedSlotData = selectedSlot ? spellSlots?.[selectedSlot] : null
+  const slotsLeft = selectedSlotData ? selectedSlotData.total - selectedSlotData.expended : 0
   const noSlots = !isCantrip && slotsLeft <= 0
+  const isUpcast = !isCantrip && selectedSlot > spell.level
 
   // Close on Escape
   useEffect(() => {
@@ -57,8 +67,8 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
   }, [onClose])
 
   function handleCast() {
-    if (isCantrip || noSlots) return
-    castSpell(spell.level)
+    if (isCantrip || noSlots || !selectedSlot) return
+    castSpell(selectedSlot)
     onClose()
   }
 
@@ -138,30 +148,95 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
         </div>
 
         {/* Description */}
-        <div className="px-5 py-4 max-h-64 overflow-y-auto">
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{spell.notes}</p>
+        <div className="px-5 py-4 max-h-48 overflow-y-auto">
+          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+            {spell.notes?.split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
+              /^\d+d\d+/.test(part)
+                ? <span key={i} className="font-bold text-amber-300 text-base">{part}</span>
+                : part
+            )}
+          </p>
         </div>
 
-        {/* Footer — cast button */}
-        {!isCantrip && (
-          <div className={`px-5 py-4 border-t border-violet-800/20 flex items-center justify-between gap-3`}>
-            <div className="text-xs text-violet-300/50">
-              {slotData
-                ? <span>{slotsLeft} / {slotData.total} slots remaining</span>
-                : <span>No slots at this level</span>
-              }
+        {/* Upcast scaling info */}
+        {spell.upcast && (
+          <div className="px-5 pb-3">
+            <div className="rounded-lg bg-violet-900/20 border border-violet-700/30 px-3 py-2 text-xs text-violet-300/70">
+              <span className="text-violet-400/50 font-semibold uppercase tracking-wider mr-1.5">At Higher Levels:</span>
+              {spell.upcast}
             </div>
-            <button
-              onClick={handleCast}
-              disabled={noSlots}
-              className={`px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 ${
-                noSlots
-                  ? 'bg-violet-950/40 border border-violet-800/30 text-violet-500/40 cursor-not-allowed'
-                  : 'bg-violet-700/60 border border-violet-500/50 text-white hover:bg-violet-600/70 hover:border-violet-400/60 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
-              }`}
-            >
-              {noSlots ? 'No Slots Left' : `Cast (uses lvl ${spell.level} slot)`}
-            </button>
+          </div>
+        )}
+
+        {/* Footer — slot picker + cast */}
+        {!isCantrip && (
+          <div className="px-5 py-4 border-t border-violet-800/20 space-y-3">
+            {/* Slot level picker */}
+            {availableSlotLevels.length > 1 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-violet-400/40 uppercase tracking-wider font-semibold">Slot Level</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {availableSlotLevels.map(lvl => {
+                    const sd = spellSlots[lvl]
+                    const left = sd.total - sd.expended
+                    const isSel = selectedSlot === lvl
+                    const isBase = lvl === spell.level
+                    return (
+                      <button
+                        key={lvl}
+                        onClick={() => setSelectedSlot(lvl)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-100 ${
+                          isSel
+                            ? isBase
+                              ? 'bg-violet-700/60 border-violet-500/60 text-white shadow-[0_0_8px_rgba(139,92,246,0.25)]'
+                              : 'bg-amber-700/50 border-amber-500/50 text-amber-100 shadow-[0_0_8px_rgba(251,191,36,0.2)]'
+                            : left === 0
+                              ? 'bg-violet-950/20 border-violet-900/20 text-violet-600/30 cursor-not-allowed'
+                              : 'bg-violet-950/40 border-violet-800/40 text-violet-300/60 hover:border-violet-600/50 hover:text-violet-200'
+                        }`}
+                        disabled={left === 0}
+                      >
+                        {!isBase && <span className="mr-1 opacity-70">↑</span>}Lvl {lvl}
+                        <span className="ml-1 opacity-60">({left})</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Upcast effect callout */}
+            {isUpcast && spell.upcast && (
+              <div className="rounded-lg bg-amber-900/20 border border-amber-700/30 px-3 py-2 text-xs text-amber-200/80 flex items-start gap-2">
+                <span className="text-amber-400 mt-0.5">⬆</span>
+                <span>
+                  <span className="font-semibold text-amber-300">Upcast ×{selectedSlot - spell.level}: </span>
+                  {spell.upcast}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-violet-300/50">
+                {selectedSlotData
+                  ? <span>{slotsLeft} / {selectedSlotData.total} slots remaining at level {selectedSlot}</span>
+                  : <span>No slots at this level</span>
+                }
+              </div>
+              <button
+                onClick={handleCast}
+                disabled={noSlots}
+                className={`px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 ${
+                  noSlots
+                    ? 'bg-violet-950/40 border border-violet-800/30 text-violet-500/40 cursor-not-allowed'
+                    : isUpcast
+                      ? 'bg-amber-700/50 border border-amber-500/50 text-amber-100 hover:bg-amber-600/60 hover:border-amber-400/60 shadow-[0_0_12px_rgba(251,191,36,0.15)]'
+                      : 'bg-violet-700/60 border border-violet-500/50 text-white hover:bg-violet-600/70 hover:border-violet-400/60 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
+                }`}
+              >
+                {noSlots ? 'No Slots Left' : isUpcast ? `⬆ Cast at Level ${selectedSlot}` : `Cast (lvl ${selectedSlot} slot)`}
+              </button>
+            </div>
           </div>
         )}
         {isCantrip && (
