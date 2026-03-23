@@ -306,6 +306,7 @@ function CharacterApp() {
                 spellAttackBonus={charState.spellAttackBonus}
                 spellSlots={charState.spellSlots}
                 castSpell={charState.castSpell}
+                rollDice={roll}
               />
             }
           />

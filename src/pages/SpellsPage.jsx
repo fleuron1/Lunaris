@@ -30,6 +30,8 @@ function adaptSpell(s) {
     mat: s.material,
     source: s.source,
     notes: s.description,
+    description: s.description,
+    upcast: s.atHigherLevels || null,
   }
 }
 
@@ -41,7 +43,26 @@ const ALL_SPELLS = [
 
 // ── Spell Detail Modal ────────────────────────────────────────────────────────
 
-function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
+// Compute final dice notation for a spell at a given slot level
+function computeRollNotation(spell, slotLevel) {
+  if (!spell.rollBase) return null
+  const base = spell.rollBase  // e.g. '3d8', '1d8+4', '2d10'
+  if (!spell.upcastDie || !slotLevel || slotLevel <= spell.level) return base
+
+  const levels = slotLevel - spell.level  // how many levels above base
+  // Parse upcastDie: e.g. '1d8' → count=1, die=8  '2d6' → count=2, die=6
+  const [upCount, upDie] = spell.upcastDie.split('d').map(Number)
+  const totalUpDice = upCount * levels
+
+  // Parse base: e.g. '3d8' '5d8' '6d6' '1d8+4' '2d10'
+  const baseMatch = base.match(/^(\d+)d(\d+)(.*)$/)
+  if (!baseMatch) return base
+  const [, bCount, bDie, bBonus] = baseMatch
+  if (Number(bDie) !== upDie) return base  // different die types — just return base
+  return `${Number(bCount) + totalUpDice}d${bDie}${bBonus}`
+}
+
+function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase, rollDice }) {
   const isCantrip = spell.level === 'C'
   const isLunar = !!spell.lunar
   const isActivePhase = spell.lunar === lunarPhase
@@ -59,6 +80,10 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
   const noSlots = !isCantrip && slotsLeft <= 0
   const isUpcast = !isCantrip && selectedSlot > spell.level
 
+  const rollNotation = isCantrip
+    ? spell.rollBase
+    : computeRollNotation(spell, selectedSlot)
+
   // Close on Escape
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -67,8 +92,9 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
   }, [onClose])
 
   function handleCast() {
-    if (isCantrip || noSlots || !selectedSlot) return
-    castSpell(selectedSlot)
+    if (!isCantrip && (noSlots || !selectedSlot)) return
+    if (!isCantrip) castSpell(selectedSlot)
+    if (rollNotation && rollDice) rollDice(spell.name, rollNotation, 'violet')
     onClose()
   }
 
@@ -148,9 +174,20 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
         </div>
 
         {/* Description */}
-        <div className="px-5 py-4 max-h-48 overflow-y-auto">
+        <div className="px-5 py-4 max-h-52 overflow-y-auto space-y-3">
+          {/* Short notes summary (always shown) */}
+          {spell.notes && (
+            <p className="text-xs text-violet-300/50 font-medium uppercase tracking-wider border-b border-violet-900/30 pb-2">
+              {spell.notes.split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
+                /^\d+d\d+/.test(part)
+                  ? <span key={i} className="font-bold text-amber-300 text-sm normal-case tracking-normal">{part}</span>
+                  : part
+              )}
+            </p>
+          )}
+          {/* Full description */}
           <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {spell.notes?.split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
+            {(spell.description || spell.notes || '').split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
               /^\d+d\d+/.test(part)
                 ? <span key={i} className="font-bold text-amber-300 text-base">{part}</span>
                 : part
@@ -205,13 +242,16 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
               </div>
             )}
 
-            {/* Upcast effect callout */}
+            {/* Upcast effect + dice preview */}
             {isUpcast && spell.upcast && (
               <div className="rounded-lg bg-amber-900/20 border border-amber-700/30 px-3 py-2 text-xs text-amber-200/80 flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">⬆</span>
                 <span>
                   <span className="font-semibold text-amber-300">Upcast ×{selectedSlot - spell.level}: </span>
                   {spell.upcast}
+                  {rollNotation && rollNotation !== spell.rollBase && (
+                    <span className="ml-2 font-bold text-amber-200">→ {rollNotation}</span>
+                  )}
                 </span>
               </div>
             )}
@@ -226,7 +266,7 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
               <button
                 onClick={handleCast}
                 disabled={noSlots}
-                className={`px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 ${
+                className={`px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-150 flex items-center gap-2 ${
                   noSlots
                     ? 'bg-violet-950/40 border border-violet-800/30 text-violet-500/40 cursor-not-allowed'
                     : isUpcast
@@ -235,13 +275,22 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase }) {
                 }`}
               >
                 {noSlots ? 'No Slots Left' : isUpcast ? `⬆ Cast at Level ${selectedSlot}` : `Cast (lvl ${selectedSlot} slot)`}
+                {!noSlots && rollNotation && <span className="opacity-60 text-xs">🎲 {rollNotation}</span>}
               </button>
             </div>
           </div>
         )}
         {isCantrip && (
-          <div className="px-5 py-3 border-t border-violet-800/20 flex justify-end">
+          <div className="px-5 py-3 border-t border-violet-800/20 flex items-center justify-between gap-3">
             <span className="text-xs text-violet-400/40 italic">Cantrips don't use spell slots</span>
+            {spell.rollBase && (
+              <button
+                onClick={handleCast}
+                className="px-4 py-1.5 rounded-xl font-semibold text-sm bg-violet-700/60 border border-violet-500/50 text-white hover:bg-violet-600/70 transition-all flex items-center gap-2"
+              >
+                Cast <span className="opacity-60 text-xs">🎲 {spell.rollBase}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -344,7 +393,7 @@ function SpellCard({ spell, concentration, setConcentration, lunarPhase, onOpen,
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell }) {
+export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell, rollDice }) {
   const [selectedSpell, setSelectedSpell] = useState(null)
 
   const grouped = {}
@@ -375,6 +424,7 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
           spellSlots={spellSlots}
           castSpell={castSpell}
           lunarPhase={lunarPhase}
+          rollDice={rollDice}
         />
       )}
 
