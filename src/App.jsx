@@ -280,6 +280,7 @@ function getSheetType(characterId) {
 function CharacterApp() {
   const { characterId } = useParams()
   const charState = useCharacterState(characterId)
+  const { roll } = useDiceRoller()
 
   return (
     <>
