@@ -432,8 +432,16 @@ function FighterApp() {
 
 function CharacterRouter() {
   const { characterId } = useParams()
-  const [sheetType] = useState(() => getSheetType(characterId))
+  const sheetType = getSheetType(characterId)
   return sheetType === 'fighter' ? <FighterApp /> : <CharacterApp />
+}
+
+// Remount the whole sub-app when the character changes so per-character
+// state hooks (useCharacterState/useFighterState) and the sheet-type pick
+// don't carry stale data across a direct character-to-character navigation.
+function CharacterRouterKeyed() {
+  const { characterId } = useParams()
+  return <CharacterRouter key={characterId} />
 }
 
 // ── Root app ──────────────────────────────────────────────────────────────────
@@ -445,7 +453,7 @@ export default function App() {
       <div className="relative z-10">
         <Routes>
           <Route path="/" element={<CharactersPage />} />
-          <Route path="/:characterId/*" element={<CharacterRouter />} />
+          <Route path="/:characterId/*" element={<CharacterRouterKeyed />} />
         </Routes>
       </div>
     </div>

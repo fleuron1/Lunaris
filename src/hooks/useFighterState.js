@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ABILITIES, SKILLS, SAVE_PROFS } from '../data/tonti.js'
 import { getMaxHp, getProfBonus } from '../data/fighter-progression.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
@@ -111,7 +111,7 @@ export function useFighterState(characterId = 'tonti') {
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
   }, [state])
 
-  const update = (patch) => setState(prev => ({ ...prev, ...patch }))
+  const update = useCallback((patch) => setState(prev => ({ ...prev, ...patch })), [])
 
   // ── HP ──────────────────────────────────────────────────
   function adjustHp(delta) {

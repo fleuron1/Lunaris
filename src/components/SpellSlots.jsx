@@ -1,11 +1,12 @@
-import { SPELL_SLOT_MAX } from '../data/annabelle.js'
-
 const LEVEL_LABELS = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']
 
 export default function SpellSlots({ spellSlots, toggleSpellSlot }) {
-  const activeLevels = Object.keys(SPELL_SLOT_MAX)
+  // Drive the visible rows off the character's actual slots so the display
+  // tracks level changes and never shows a phantom 0/0 row.
+  const activeLevels = Object.keys(spellSlots || {})
     .map(Number)
-    .filter(lvl => SPELL_SLOT_MAX[lvl] > 0)
+    .filter(lvl => spellSlots[lvl]?.total > 0)
+    .sort((a, b) => a - b)
 
   return (
     <div className="card p-4 space-y-3">

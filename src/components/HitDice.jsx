@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function HitDice({
   level, hitDiceSpent, hitDiceType, conMod,
@@ -6,7 +6,12 @@ export default function HitDice({
   theme = 'violet',
 }) {
   const available = level - hitDiceSpent
-  const [flash, setFlash] = useState(null)  // { die, conMod, total }
+  const [flash, setFlash] = useState(null)  // { die, conMod, total, id }
+  const flashId  = useRef(0)
+  const timerRef = useRef(null)
+
+  // Clear any pending hide-timer on unmount
+  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   const isV = theme === 'violet'
   const hdr   = isV ? 'section-header' : 'text-[10px] font-bold uppercase tracking-[0.14em] text-pink-400/55 mb-2'
@@ -23,8 +28,9 @@ export default function HitDice({
     if (available <= 0 || !rollHitDie) return
     const result = rollHitDie()
     if (!result) return
-    setFlash(result)
-    setTimeout(() => setFlash(null), 2200)
+    setFlash({ ...result, id: ++flashId.current })
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setFlash(null), 2200)
   }
 
   const conStr = conMod >= 0 ? `+${conMod}` : `${conMod}`
@@ -62,8 +68,8 @@ export default function HitDice({
         {/* Heal flash */}
         {flash && (
           <span
-            key={flash.die + flash.total + Math.random()}
-            className={`text-xs font-bold px-2 py-0.5 rounded-full border ${flashBg} animate-fade-in`}
+            key={flash.id}
+            className={`text-xs font-bold px-2 py-0.5 rounded-full border ${flashBg}`}
             style={{ animation: 'fadeInUp 0.25s ease both' }}
           >
             🩹 d{hitDiceType}={flash.die} {conStr} = +{flash.total} HP

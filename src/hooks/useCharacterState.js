@@ -251,7 +251,8 @@ export function useCharacterState(characterId = 'annabelle') {
         ...prev,
         level: newLevel,
         spellSlots: slots,
-        sorceryPoints: Math.min(SORCERY_POINTS[prev.level - 1], SORCERY_POINTS[newLevel - 1]),
+        // Keep however many points are currently unspent, capped at the new max.
+        sorceryPoints: Math.min(prev.sorceryPoints ?? SORCERY_POINTS[newLevel - 1], SORCERY_POINTS[newLevel - 1]),
         currentHp: Math.min(prev.currentHp + (newMaxHp - oldMaxHp), newMaxHp),
       }
     })

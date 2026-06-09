@@ -17,7 +17,7 @@ export default function DeathSaves({ deathSaves, toggleDeathSave, resetDeathSave
         { type: 'failures',  label: 'Failures',  color: 'red' },
       ].map(({ type, label, color }) => (
         <div key={type} className="flex items-center gap-3">
-          <span className={`text-xs font-semibold text-${color}-400/70 w-20`}>{label}</span>
+          <span className={`text-xs font-semibold w-20 ${color === 'emerald' ? 'text-emerald-400/70' : 'text-red-400/70'}`}>{label}</span>
           <div className="flex gap-2">
             {[0, 1, 2].map(i => {
               const filled = i < deathSaves[type]

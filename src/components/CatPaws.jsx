@@ -77,6 +77,7 @@ function generateWalk() {
 export default function CatPaws() {
   const [paws, setPaws]   = useState([])
   const timerRef          = useRef(null)
+  const clearRef          = useRef(null)
 
   useEffect(() => {
     injectStyles()
@@ -87,7 +88,7 @@ export default function CatPaws() {
 
       // Clean up after all paws have finished fading
       const totalMs   = (walk.length - 1) * 370 + 4200 + 400
-      setTimeout(() => setPaws([]), totalMs)
+      clearRef.current = setTimeout(() => setPaws([]), totalMs)
 
       // Schedule next walk: 35–90 seconds later
       timerRef.current = setTimeout(triggerWalk, 35000 + Math.random() * 55000)
@@ -96,7 +97,10 @@ export default function CatPaws() {
     // First walk: 10–25 seconds after mount
     timerRef.current = setTimeout(triggerWalk, 10000 + Math.random() * 15000)
 
-    return () => clearTimeout(timerRef.current)
+    return () => {
+      clearTimeout(timerRef.current)
+      clearTimeout(clearRef.current)
+    }
   }, [])
 
   if (!paws.length) return null
