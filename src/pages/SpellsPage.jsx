@@ -12,13 +12,15 @@ const PHASE_STYLES = {
 
 const PHASE_ICONS = { full: '🌕', new: '🌑', crescent: '🌙' }
 
-// Lunar bonus spells from annabelle.js (have curated notes + lunar field)
-const LUNAR_SPELL_MAP = {}
-LUNAR_SPELLS.filter(s => s.lunar).forEach(s => { LUNAR_SPELL_MAP[s.name] = s })
-const LUNAR_NAMES = new Set(Object.keys(LUNAR_SPELL_MAP))
+// Curated spells from annabelle.js — hand-written notes, lunar tags, and dice
+// fields (rollBase/upcastDie) that the JSON list doesn't have
+const CURATED_MAP = {}
+LUNAR_SPELLS.forEach(s => { CURATED_MAP[s.name] = s })
 
-// Convert sorcerer-spells.json entry to the shape SpellCard expects
+// Convert sorcerer-spells.json entry to the shape SpellCard expects, layering
+// curated fields on top when we have them so dice rolling works for all of them
 function adaptSpell(s) {
+  const curated = CURATED_MAP[s.name]
   return {
     name: s.name,
     level: s.level === 0 ? 'C' : s.level,
@@ -29,16 +31,21 @@ function adaptSpell(s) {
     ritual: s.ritual,
     mat: s.material,
     source: s.source,
-    notes: s.description,
-    description: s.description,
-    upcast: s.atHigherLevels || null,
+    notes: curated?.notes ?? s.description,
+    description: s.description || curated?.description,
+    upcast: s.atHigherLevels || curated?.upcast || null,
+    lunar: curated?.lunar,
+    rollBase: curated?.rollBase,
+    upcastDie: curated?.upcastDie,
   }
 }
 
-// Full spell list: lunar bonus spells (with lunar metadata) + all other sorcerer spells
+// Full spell list: every sorcerer spell from the JSON (enriched with curated
+// data), plus curated spells not on the sorcerer list (lunar bonus spells)
+const JSON_NAMES = new Set(sorcererSpells.map(s => s.name))
 const ALL_SPELLS = [
-  ...Object.values(LUNAR_SPELL_MAP),
-  ...sorcererSpells.filter(s => !LUNAR_NAMES.has(s.name)).map(adaptSpell),
+  ...sorcererSpells.map(adaptSpell),
+  ...LUNAR_SPELLS.filter(s => !JSON_NAMES.has(s.name)),
 ]
 
 // ── Spell Detail Modal ────────────────────────────────────────────────────────
