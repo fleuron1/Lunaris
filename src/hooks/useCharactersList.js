@@ -66,12 +66,22 @@ export function useCharactersList() {
 
   useEffect(() => { save(characters) }, [characters])
 
-  function addCharacter({ name, race, characterClass, accent = 'violet' }) {
-    const id = toId(name) || `char-${Date.now()}`
-    setCharacters(prev => {
-      if (prev.find(c => c.id === id)) return prev
-      return [...prev, { id, name, race, characterClass, accent }]
-    })
+  function addCharacter({ id: explicitId, name, race, characterClass, accent = 'violet' }) {
+    let id = explicitId || toId(name) || `char-${Date.now()}`
+    // Never silently reuse an existing id — suffix instead
+    const taken = new Set(characters.map(c => c.id))
+    if (!explicitId && taken.has(id)) {
+      let n = 2
+      while (taken.has(`${id}-${n}`)) n++
+      id = `${id}-${n}`
+    }
+    // Save synchronously: callers often navigate away in the same event, which
+    // can unmount this hook before the save effect sees the updated list.
+    if (!characters.find(c => c.id === id)) {
+      const next = [...characters, { id, name, race, characterClass, accent }]
+      save(next)
+      setCharacters(next)
+    }
     return id
   }
 

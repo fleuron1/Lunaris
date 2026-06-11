@@ -51,6 +51,12 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
     notes: '',
     ac: 11,
     speed: 30,
+    // Identity (species fields are null/Annabelle defaults for legacy saves;
+    // SheetPage falls back to the static Warforged data when speciesTraits is null)
+    species: 'Warforged',
+    size: 'Med',
+    subclass: 'Lunar',
+    speciesTraits: null,
     // Skill proficiencies: { 'Deception': 'proficient' | 'expert' }
     skillProfs: { ...DEFAULT_SKILL_PROFS },
     // Weapons & gear
@@ -99,6 +105,53 @@ function loadState(characterId) {
 
 function saveState(characterId, state) {
   try { localStorage.setItem(storageKey(characterId), JSON.stringify(state)) } catch {}
+}
+
+// ── Character creation (used by the /create wizard) ───────────────────────────
+// Builds a COMPLETE state object for a brand-new character. Every identity field
+// must be overridden here — anything missed would fall back to Annabelle's data.
+export function createCharacterState({
+  characterName, background = '', notes = '',
+  species = 'Unknown', size = 'Med', speed = 30, speciesTraits = [],
+  level = 1, abilityScores, ac,
+  skillProfs = {}, languages = ['Common'],
+  knownCantrips = [], knownSpells = [], chosenMetamagic = [],
+  weapons = [], equipment = [], currency = { cp: 0, sp: 0, gp: 0, pp: 0 },
+  xp = 0,
+}) {
+  const base = buildDefaults(level, abilityScores)
+  const dexMod = Math.floor(((abilityScores?.dex ?? 10) - 10) / 2)
+  return {
+    ...base,
+    characterName: characterName || 'Unnamed Hero',
+    background,
+    notes,
+    species,
+    size,
+    speed,
+    speciesTraits,
+    subclass: 'Lunar',
+    ac: ac ?? 10 + dexMod,
+    xp,
+    skillProfs,
+    languages,
+    knownCantrips: [...knownCantrips],
+    knownSpells: [...knownSpells],
+    chosenMetamagic: [...chosenMetamagic],
+    weapons: weapons.map(w => ({ id: w.id || uid(), ...w })),
+    equipment: equipment.map(e => ({ id: e.id || uid(), ...e })),
+    currency: { ...currency },
+    feats: [],
+  }
+}
+
+// Write a freshly created character to localStorage AND push it to the cloud
+// immediately — the sheet's mount-time pull treats cloud as the winner, so a
+// stale cloud row (e.g. from a deleted character with the same id) must not
+// survive past creation. saveToCloud fails silently when offline.
+export function persistNewCharacter(characterId, state) {
+  saveState(characterId, state)
+  saveToCloud(characterId, state)
 }
 
 export function useCharacterState(characterId = 'annabelle') {

@@ -8,6 +8,7 @@ import EditPage from './pages/EditPage.jsx'
 import TontiSheetPage from './pages/TontiSheetPage.jsx'
 import FighterEditPage from './pages/FighterEditPage.jsx'
 import CharactersPage from './pages/CharactersPage.jsx'
+import CreatePage from './pages/CreatePage.jsx'
 import StarField from './components/StarField.jsx'
 import SnowField from './components/SnowField.jsx'
 import CatPaws from './components/CatPaws.jsx'
@@ -453,6 +454,7 @@ export default function App() {
       <div className="relative z-10">
         <Routes>
           <Route path="/" element={<CharactersPage />} />
+          <Route path="/create" element={<CreatePage />} />
           <Route path="/:characterId/*" element={<CharacterRouterKeyed />} />
         </Routes>
       </div>

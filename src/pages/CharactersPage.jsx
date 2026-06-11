@@ -1,6 +1,7 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCharactersList, getCharacterLevel } from '../hooks/useCharactersList.js'
+import { RESERVED_IDS } from '../data/character-creation.js'
+import { saveToCloud } from '../lib/supabase.js'
 
 const ACCENT_STYLES = {
   violet: 'border-l-violet-500 hover:shadow-[0_0_20px_rgba(139,92,246,0.15)]',
@@ -19,15 +20,6 @@ const ACCENT_TEXT = {
   emerald:'text-emerald-400',
   slate:  'text-slate-400',
 }
-
-const ACCENT_OPTIONS = [
-  { value: 'violet', label: 'Violet' },
-  { value: 'amber',  label: 'Amber'  },
-  { value: 'blue',   label: 'Blue'   },
-  { value: 'rose',   label: 'Rose'   },
-  { value: 'emerald',label: 'Emerald'},
-  { value: 'slate',  label: 'Slate'  },
-]
 
 function CharacterCard({ character, onPlay, onDelete }) {
   const level = getCharacterLevel(character.id)
@@ -84,113 +76,26 @@ function CharacterCard({ character, onPlay, onDelete }) {
   )
 }
 
-function NewCharacterForm({ onSubmit, onCancel }) {
-  const [name, setName] = useState('')
-  const [race, setRace] = useState('')
-  const [characterClass, setCharacterClass] = useState('')
-  const [accent, setAccent] = useState('violet')
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    onSubmit({ name: name.trim(), race: race.trim(), characterClass: characterClass.trim(), accent })
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-violet-950/40 border border-violet-700/40 rounded-xl p-5 space-y-3"
-      onClick={e => e.stopPropagation()}
-    >
-      <h3 className="text-sm font-bold text-violet-200 mb-4" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
-        New Character
-      </h3>
-      <div>
-        <label className="text-xs text-violet-400/60 uppercase tracking-wider block mb-1">Name *</label>
-        <input
-          autoFocus
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="e.g. Theron"
-          className="w-full bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-violet-600/40 focus:outline-none focus:border-violet-500/60"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-violet-400/60 uppercase tracking-wider block mb-1">Race</label>
-          <input
-            value={race}
-            onChange={e => setRace(e.target.value)}
-            placeholder="e.g. Elf"
-            className="w-full bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-violet-600/40 focus:outline-none focus:border-violet-500/60"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-violet-400/60 uppercase tracking-wider block mb-1">Class</label>
-          <input
-            value={characterClass}
-            onChange={e => setCharacterClass(e.target.value)}
-            placeholder="e.g. Wizard"
-            className="w-full bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-violet-600/40 focus:outline-none focus:border-violet-500/60"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="text-xs text-violet-400/60 uppercase tracking-wider block mb-1">Colour</label>
-        <div className="flex gap-2 flex-wrap">
-          {ACCENT_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setAccent(opt.value)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                accent === opt.value
-                  ? 'border-violet-400/60 bg-violet-800/40 text-violet-200'
-                  : 'border-violet-900/30 text-violet-500/50 hover:border-violet-700/50'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex gap-2 pt-1">
-        <button
-          type="submit"
-          className="flex-1 bg-violet-700/60 border border-violet-500/50 text-white text-sm font-semibold py-2 rounded-lg hover:bg-violet-600/70 transition-colors"
-        >
-          Create
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 bg-violet-950/40 border border-violet-900/30 text-violet-400/60 text-sm rounded-lg hover:text-violet-200 transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  )
-}
-
 export default function CharactersPage() {
   const navigate = useNavigate()
-  const { characters, addCharacter, removeCharacter } = useCharactersList()
-  const [showNewForm, setShowNewForm] = useState(false)
+  const { characters, removeCharacter } = useCharactersList()
 
   function handlePlay(id) {
     navigate(`/${id}`)
   }
 
   function handleDelete(id) {
-    if (window.confirm(`Remove ${id} from your list?`)) {
-      removeCharacter(id)
+    const isDefault = RESERVED_IDS.includes(id)
+    const msg = isDefault
+      ? `Remove ${id} from your list? (Their sheet data is kept and they'll return on reload.)`
+      : `Delete ${id}? This removes their saved sheet data too.`
+    if (!window.confirm(msg)) return
+    removeCharacter(id)
+    if (!isDefault) {
+      // Custom character: wipe saved state so a future character can reuse the id
+      try { localStorage.removeItem(`character-${id}-v2`) } catch {}
+      saveToCloud(id, {}) // null out the cloud row (fails silently offline)
     }
-  }
-
-  function handleCreate(data) {
-    const id = addCharacter(data)
-    navigate(`/${id}/edit`)
   }
 
   return (
@@ -218,21 +123,15 @@ export default function CharactersPage() {
           />
         ))}
 
-        {/* New character slot */}
-        {showNewForm ? (
-          <NewCharacterForm
-            onSubmit={handleCreate}
-            onCancel={() => setShowNewForm(false)}
-          />
-        ) : (
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="border-2 border-dashed border-violet-800/30 rounded-xl p-5 text-violet-600/40 hover:border-violet-600/50 hover:text-violet-400/60 hover:bg-violet-950/20 transition-all duration-200 flex flex-col items-center justify-center gap-2 min-h-[180px]"
-          >
-            <span className="text-3xl">+</span>
-            <span className="text-sm font-medium">New Character</span>
-          </button>
-        )}
+        {/* New character slot → full creation wizard */}
+        <button
+          onClick={() => navigate('/create')}
+          className="border-2 border-dashed border-violet-800/30 rounded-xl p-5 text-violet-600/40 hover:border-violet-600/50 hover:text-violet-400/60 hover:bg-violet-950/20 transition-all duration-200 flex flex-col items-center justify-center gap-2 min-h-[180px]"
+        >
+          <span className="text-3xl">+</span>
+          <span className="text-sm font-medium">Create a Character</span>
+          <span className="text-[11px] text-violet-700/50">Full guided builder</span>
+        </button>
       </div>
     </div>
   )

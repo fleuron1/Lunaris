@@ -43,9 +43,15 @@ export default function SheetPage({
   ac, speed, characterName, background,
   spellSaveDC, spellAttackBonus, chosenMetamagic,
   currency, setCurrency,
+  species, size, speciesTraits,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
+
+  // Created characters carry their own species data; Annabelle's legacy saves
+  // fall back to the static Warforged data
+  const speciesName = species || 'Warforged'
+  const traits = (speciesTraits && speciesTraits.length) ? speciesTraits : SPECIES_TRAITS
 
   function handleLongRest() {
     if (showLongRestConfirm) {
@@ -77,7 +83,7 @@ export default function SheetPage({
               {characterName || 'Annabelle'}
             </h1>
             <p className="text-slate-300 text-sm mt-1.5">
-              <span className="text-violet-300">Warforged</span>
+              <span className="text-violet-300">{speciesName}</span>
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-violet-200">Sorcerer</span>
               <span className="text-slate-500 text-xs"> (Lunar)</span>
@@ -91,7 +97,7 @@ export default function SheetPage({
           <div className="flex flex-wrap gap-2 items-center">
             <StatBadge label="AC" value={ac ?? 11} />
             <StatBadge label="Speed" value={speed ?? 30} sub="ft" />
-            <StatBadge label="Size" value="Med" />
+            <StatBadge label="Size" value={size || 'Med'} />
             <StatBadge label="Pass. Perc." value={passPerc} />
             <StatBadge label="Prof. Bonus" value={`+${profBonus}`} />
 
@@ -295,19 +301,28 @@ export default function SheetPage({
             <div className="card p-4">
               <p className="section-header">Class Features</p>
               <div className="space-y-2">
-                {CLASS_FEATURES.map(f => (
-                  <div key={f.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
-                    <p className="font-semibold text-violet-300 text-sm">{f.name}</p>
-                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{f.description}</p>
-                  </div>
-                ))}
+                {CLASS_FEATURES
+                  .filter(f => !(f.name === 'Font of Magic' && level < 2) && !(f.name === 'Metamagic' && level < 3))
+                  .map(f => {
+                    // Level-dependent feature text computed from live state
+                    const description =
+                      f.name === 'Spellcasting' ? `CHA-based. Spell Save DC ${spellSaveDC} | Spell Attack +${spellAttackBonus}.`
+                      : f.name === 'Font of Magic' ? `You have ${maxSorceryPoints} Sorcery Points. Convert spell slots to SP or vice versa.`
+                      : f.description
+                    return (
+                      <div key={f.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+                        <p className="font-semibold text-violet-300 text-sm">{f.name}</p>
+                        <p className="text-slate-400 text-xs mt-1 leading-relaxed">{description}</p>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
 
             <div className="card p-4">
-              <p className="section-header">Species Traits — Warforged</p>
+              <p className="section-header">Species Traits — {speciesName}</p>
               <div className="space-y-2">
-                {SPECIES_TRAITS.map(t => (
+                {traits.map(t => (
                   <div key={t.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
                     <p className="font-semibold text-amber-300/80 text-sm">{t.name}</p>
                     <p className="text-slate-400 text-xs mt-1 leading-relaxed">{t.description}</p>
