@@ -123,8 +123,10 @@ function QuickDiceMenu({ theme = 'violet' }) {
 
 // ── Sorcerer Nav Bar ──────────────────────────────────────────────────────────
 
-function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncStatus }) {
+function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncStatus, classInfo }) {
   const base = `/${characterId}`
+  // Lunar sorcerers show their moon phase; other classes show their class icon
+  const showMoon = !classInfo || classInfo.hasLunarPhases
   const NAV_LINKS = [
     { to: base,          label: 'Sheet',   end: true  },
     { to: `${base}/spells`, label: 'Spells',  end: false },
@@ -147,13 +149,13 @@ function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncSt
         </Link>
 
         <div className="flex items-center gap-2 mr-3">
-          <span className="text-xl animate-float">{PHASE_ICONS[lunarPhase] || '🌕'}</span>
+          <span className="text-xl animate-float">{showMoon ? (PHASE_ICONS[lunarPhase] || '🌕') : (classInfo?.icon || '✦')}</span>
           <div className="hidden sm:block">
             <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
               {characterName || 'Character'}
             </p>
             <p className="text-[10px] text-violet-300/55 leading-none mt-0.5">
-              {LUNAR_PHASES[lunarPhase]?.name || ''}
+              {showMoon ? (LUNAR_PHASES[lunarPhase]?.name || '') : (classInfo?.name || '')}
             </p>
           </div>
         </div>
@@ -291,6 +293,7 @@ function CharacterApp() {
         lunarPhase={charState.lunarPhase}
         level={charState.level}
         syncStatus={charState.syncStatus}
+        classInfo={charState.classInfo}
       />
       <main>
         <Routes>
@@ -309,6 +312,9 @@ function CharacterApp() {
                 spellSlots={charState.spellSlots}
                 castSpell={charState.castSpell}
                 rollDice={roll}
+                characterClass={charState.characterClass}
+                spellcastingAbility={charState.spellcastingAbility}
+                classInfo={charState.classInfo}
               />
             }
           />
@@ -354,6 +360,9 @@ function CharacterApp() {
                 setCharacterName={charState.setCharacterName}
                 setBackground={charState.setBackground}
                 setNotes={charState.setNotes}
+                characterClass={charState.characterClass}
+                subclass={charState.subclass}
+                classInfo={charState.classInfo}
               />
             }
           />

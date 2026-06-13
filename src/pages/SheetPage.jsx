@@ -44,6 +44,7 @@ export default function SheetPage({
   spellSaveDC, spellAttackBonus, chosenMetamagic,
   currency, setCurrency,
   species, size, speciesTraits,
+  characterClass, subclass, classInfo, hitDiceType, spellcastingAbility,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
@@ -52,6 +53,7 @@ export default function SheetPage({
   // fall back to the static Warforged data
   const speciesName = species || 'Warforged'
   const traits = (speciesTraits && speciesTraits.length) ? speciesTraits : SPECIES_TRAITS
+  const cls = classInfo || { name: 'Sorcerer', hasLunarPhases: true, hasSorceryPoints: true, hasMetamagic: true, features: CLASS_FEATURES.map(f => ({ ...f, level: 1 })) }
 
   function handleLongRest() {
     if (showLongRestConfirm) {
@@ -85,8 +87,8 @@ export default function SheetPage({
             <p className="text-slate-300 text-sm mt-1.5">
               <span className="text-violet-300">{speciesName}</span>
               <span className="text-violet-500/50 mx-1.5">·</span>
-              <span className="text-violet-200">Sorcerer</span>
-              <span className="text-slate-500 text-xs"> (Lunar)</span>
+              <span className="text-violet-200">{cls.name}</span>
+              {subclass && <span className="text-slate-500 text-xs"> ({subclass})</span>}
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-amber-300/80">Level {level}</span>
             </p>
@@ -124,7 +126,7 @@ export default function SheetPage({
           <div className="flex gap-4 items-center border-l border-violet-800/30 pl-4">
             <div className="text-center">
               <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Ability</p>
-              <p className="text-sm font-bold text-violet-300 mt-0.5">CHA</p>
+              <p className="text-sm font-bold text-violet-300 mt-0.5">{(spellcastingAbility || 'cha').toUpperCase()}</p>
             </div>
             <div className="text-center">
               <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Save DC</p>
@@ -143,7 +145,7 @@ export default function SheetPage({
 
         {/* ── LEFT SIDEBAR ───────────────────────────────── */}
         <aside className="w-full lg:w-[272px] lg:flex-shrink-0 space-y-4 lg:sticky lg:top-16">
-          <LunarPhaseSwitcher phase={lunarPhase} setPhase={setLunarPhase} />
+          {cls.hasLunarPhases && <LunarPhaseSwitcher phase={lunarPhase} setPhase={setLunarPhase} />}
           <AbilityBlock abilityScores={abilityScores} profBonus={profBonus} />
           <SkillsList abilityScores={abilityScores} profBonus={profBonus} skillProfs={skillProfs} />
         </aside>
@@ -165,15 +167,17 @@ export default function SheetPage({
 
           {/* Sorcery Points + Hit Dice */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SorceryPoints
-              sorceryPoints={sorceryPoints}
-              maxSorceryPoints={maxSorceryPoints}
-              adjustSorceryPoints={adjustSorceryPoints}
-            />
+            {cls.hasSorceryPoints && (
+              <SorceryPoints
+                sorceryPoints={sorceryPoints}
+                maxSorceryPoints={maxSorceryPoints}
+                adjustSorceryPoints={adjustSorceryPoints}
+              />
+            )}
             <HitDice
               level={level}
               hitDiceSpent={hitDiceSpent}
-              hitDiceType={6}
+              hitDiceType={hitDiceType || 6}
               conMod={Math.floor((abilityScores.con - 10) / 2)}
               rollHitDie={rollHitDie}
               theme="violet"
@@ -223,8 +227,8 @@ export default function SheetPage({
             </div>
           )}
 
-          {/* Metamagic — only shown if level >= 3 and any chosen */}
-          {chosenMetamagic && chosenMetamagic.length > 0 && (
+          {/* Metamagic — only shown if class has it and any chosen */}
+          {cls.hasMetamagic && chosenMetamagic && chosenMetamagic.length > 0 && (
             <div className="card p-4">
               <p className="section-header">Metamagic</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -299,15 +303,16 @@ export default function SheetPage({
           {/* Class Features + Species Traits */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div className="card p-4">
-              <p className="section-header">Class Features</p>
+              <p className="section-header">Class Features — {cls.name}</p>
               <div className="space-y-2">
-                {CLASS_FEATURES
-                  .filter(f => !(f.name === 'Font of Magic' && level < 2) && !(f.name === 'Metamagic' && level < 3))
+                {(cls.features || [])
+                  .filter(f => (f.level || 1) <= level)
                   .map(f => {
                     // Level-dependent feature text computed from live state
                     const description =
-                      f.name === 'Spellcasting' ? `CHA-based. Spell Save DC ${spellSaveDC} | Spell Attack +${spellAttackBonus}.`
+                      f.name === 'Spellcasting' ? `${(spellcastingAbility || 'cha').toUpperCase()}-based. Spell Save DC ${spellSaveDC} | Spell Attack +${spellAttackBonus}.`
                       : f.name === 'Font of Magic' ? `You have ${maxSorceryPoints} Sorcery Points. Convert spell slots to SP or vice versa.`
+                      : f.name === 'Pact Magic' ? `${(spellcastingAbility || 'cha').toUpperCase()}-based. Spell Save DC ${spellSaveDC} | Spell Attack +${spellAttackBonus}. Slots recharge on a short rest.`
                       : f.description
                     return (
                       <div key={f.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">

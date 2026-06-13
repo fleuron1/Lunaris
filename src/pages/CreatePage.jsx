@@ -1,22 +1,22 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  SPECIES, BACKGROUNDS, SORCERER, ASI_LEVELS,
+  SPECIES, BACKGROUNDS, ASI_LEVELS,
   STANDARD_ARRAY, POINT_BUY_BUDGET, POINT_BUY_COSTS,
   ABILITY_KEYS, ABILITY_NAMES, ABILITY_HINTS,
   abilityMod, formatMod, pointBuyTotal,
   ALL_LANGUAGES, ALL_SKILLS,
-  WEAPON_OPTIONS, FOCUS_OPTIONS, PACK_OPTIONS, GOLD_ROLL,
   ATTACK_CANTRIPS, cantripDiceCount,
   ACCENT_OPTIONS, generateCharacterId,
 } from '../data/character-creation.js'
+import { XP_THRESHOLDS, getProfBonus, maxMetamagic } from '../data/sorcerer-progression.js'
 import {
-  CANTRIPS_KNOWN, SPELLS_KNOWN, XP_THRESHOLDS,
-  getSpellSlotMax, getMaxHp, getProfBonus, maxMetamagic,
-} from '../data/sorcerer-progression.js'
+  CLASSES, CLASS_IDS, getClass, classMaxHp, classSlotMax,
+  cantripsKnownFor, spellsLimitFor, maxCastableSpellLevel,
+  spellListFor, spellsLimitLabel, startingAc,
+} from '../data/classes.js'
 import { LUNAR_PHASES } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
-import sorcererSpells from '../data/sorcerer-spells.json'
 import { createCharacterState, persistNewCharacter } from '../hooks/useCharacterState.js'
 import { useCharactersList } from '../hooks/useCharactersList.js'
 
@@ -32,6 +32,7 @@ const emptyAbilities = (val) => ({ str: val, dex: val, con: val, int: val, wis: 
 
 const INITIAL_DRAFT = {
   name: '', accent: 'violet', speciesId: null, backgroundId: null, notes: '',
+  classId: 'sorcerer',
   level: 1,
   abilityMethod: 'standard',
   arrayAssign: emptyAbilities(null),
@@ -44,6 +45,25 @@ const INITIAL_DRAFT = {
   cantrips: [], spells: [],
   equipMode: 'kit', weaponChoice: 'crossbow', focusChoice: 'arcane-focus', packChoice: 'explorers',
   goldRolled: null,
+}
+
+// Patch to apply when the class changes — clears every class-dependent pick
+// and re-defaults equipment + origin bonus for the new class.
+function classChangePatch(classId) {
+  const cls = getClass(classId)
+  return {
+    classId,
+    classSkills: [],
+    metamagic: [],
+    cantrips: [],
+    spells: [],
+    weaponChoice: cls.kit.weaponOptions[0]?.id,
+    focusChoice: cls.kit.focusOptions[0]?.id,
+    packChoice: cls.kit.packOptions[0]?.id,
+    goldRolled: null,
+    originPlusTwo: cls.spellAbility,
+    originPlusOne: cls.spellAbility === 'con' ? 'dex' : 'con',
+  }
 }
 
 function loadDraft() {
@@ -89,12 +109,12 @@ function asiPointsAvailable(level) {
   return 2 * ASI_LEVELS.filter(l => l <= level).length
 }
 
-function maxSpellLevelFor(level) {
-  const slots = getSpellSlotMax(level)
-  let max = 0
-  for (let i = 1; i <= 9; i++) if (slots[i] > 0) max = i
-  return max
-}
+// Class-dependent derivations from the draft
+function draftClass(draft)        { return getClass(draft.classId || 'sorcerer') }
+function draftMaxSpellLevel(draft) { return maxCastableSpellLevel(draft.classId, draft.level) }
+function draftCastMod(draft)      { return abilityMod(getFinalScores(draft)[draftClass(draft).spellAbility] ?? 10) }
+function draftCantripMax(draft)   { return cantripsKnownFor(draft.classId, draft.level) }
+function draftSpellMax(draft)     { return spellsLimitFor(draft.classId, draft.level, draftCastMod(draft)) }
 
 // All automatically granted skill proficiencies (species + background)
 function grantedSkills(draft) {
@@ -116,15 +136,16 @@ function validateStep(step, draft) {
   }
 
   if (step === 1) {
+    const cls = draftClass(draft)
     const extra = species?.extraSkills || 0
-    if (draft.classSkills.length !== SORCERER.skillChoices)
-      errors.push(`Choose ${SORCERER.skillChoices} sorcerer skills (${draft.classSkills.length}/${SORCERER.skillChoices} picked).`)
+    if (draft.classSkills.length !== cls.skillChoices)
+      errors.push(`Choose ${cls.skillChoices} ${cls.name.toLowerCase()} skills (${draft.classSkills.length}/${cls.skillChoices} picked).`)
     if (extra > 0 && draft.extraSkillPicks.length !== extra)
       errors.push(`Choose ${extra} bonus skill${extra > 1 ? 's' : ''} from your species (${draft.extraSkillPicks.length}/${extra} picked).`)
     const langChoices = (species?.extraLanguages || 0) + (getBackground(draft)?.extraLanguages || 0)
     if (draft.extraLangPicks.length > langChoices)
       errors.push(`Too many extra languages picked (${draft.extraLangPicks.length}/${langChoices}).`)
-    const mmMax = draft.level >= 3 ? maxMetamagic(draft.level) : 0
+    const mmMax = cls.hasMetamagic && draft.level >= 3 ? maxMetamagic(draft.level) : 0
     if (mmMax > 0 && draft.metamagic.length !== mmMax)
       errors.push(`Choose ${mmMax} Metamagic options (${draft.metamagic.length}/${mmMax} picked).`)
   }
@@ -155,16 +176,22 @@ function validateStep(step, draft) {
   }
 
   if (step === 3) {
-    const cMax = CANTRIPS_KNOWN[draft.level - 1]
-    const sMax = SPELLS_KNOWN[draft.level - 1]
+    const list = spellListFor(draft.classId)
+    const cMax = draftCantripMax(draft)
+    const sMax = draftSpellMax(draft)
+    const label = spellsLimitLabel(draft.classId) === 'prepared' ? 'prepared spells' : 'spells'
     if (draft.cantrips.length !== cMax) errors.push(`Choose ${cMax} cantrips (${draft.cantrips.length}/${cMax} picked).`)
-    if (draft.spells.length !== sMax) errors.push(`Choose ${sMax} spells (${draft.spells.length}/${sMax} picked).`)
-    const maxLvl = maxSpellLevelFor(draft.level)
+    if (draft.spells.length !== sMax) errors.push(`Choose ${sMax} ${label} (${draft.spells.length}/${sMax} picked).`)
+    const maxLvl = draftMaxSpellLevel(draft)
     const tooHigh = draft.spells.filter(name => {
-      const sp = sorcererSpells.find(s => s.name === name)
+      const sp = list.find(s => s.name === name)
       return sp && sp.level > maxLvl
     })
     if (tooHigh.length) errors.push(`Above your max spell level (${maxLvl}): ${tooHigh.join(', ')}.`)
+    // Spells picked under a previous class that aren't on this class's list
+    const names = new Set(list.map(s => s.name))
+    const wrongClass = [...draft.cantrips, ...draft.spells].filter(n => !names.has(n))
+    if (wrongClass.length) errors.push(`Not on the ${draftClass(draft).name} spell list: ${wrongClass.join(', ')}.`)
   }
 
   if (step === 4) {
@@ -187,12 +214,15 @@ function validateAll(draft) {
 function buildFinal(draft) {
   const species = getSpecies(draft)
   const background = getBackground(draft)
+  const cls = draftClass(draft)
+  const kit = cls.kit
   const scores = getFinalScores(draft)
   const level = draft.level
   const prof = getProfBonus(level)
   const dexMod = abilityMod(scores.dex)
   const strMod = abilityMod(scores.str)
-  const chaMod = abilityMod(scores.cha)
+  const castMod = abilityMod(scores[cls.spellAbility] ?? 10)
+  const withKit = draft.equipMode === 'kit'
 
   // Skills → { name: 'proficient' }
   const skillProfs = {}
@@ -203,25 +233,26 @@ function buildFinal(draft) {
   // Languages
   const languages = [...new Set([...(species?.languages || ['Common']), ...draft.extraLangPicks])]
 
-  // Weapons table
-  const finesseMod = Math.max(strMod, dexMod)
-  const weapons = [
-    {
-      name: 'Dagger', atkBonus: formatMod(prof + finesseMod),
-      damage: `1d4${finesseMod ? formatMod(finesseMod) : ''} piercing`,
+  // Weapons table — kit weapon + dagger (when the kit includes one) + attack cantrips
+  const weaponMod = (stat) => stat === 'dex' ? dexMod : stat === 'finesse' ? Math.max(strMod, dexMod) : strMod
+  const weapons = []
+  const kitWeapon = withKit ? kit.weaponOptions.find(o => o.id === draft.weaponChoice) : null
+  if (kitWeapon) {
+    const m = weaponMod(kitWeapon.stat)
+    weapons.push({
+      name: kitWeapon.name.split(' & ')[0], atkBonus: formatMod(prof + m),
+      damage: `${kitWeapon.die}${m ? formatMod(m) : ''} ${kitWeapon.type}`,
+      notes: kitWeapon.notes,
+    })
+  }
+  const hasDaggers = withKit && kit.fixedItems.some(i => /^Dagger/.test(i.name)) && !/^Dagger/.test(kitWeapon?.name || '')
+  if (hasDaggers) {
+    const m = Math.max(strMod, dexMod)
+    weapons.push({
+      name: 'Dagger', atkBonus: formatMod(prof + m),
+      damage: `1d4${m ? formatMod(m) : ''} piercing`,
       notes: 'Finesse, Light, Thrown 20/60',
-    },
-  ]
-  if (draft.equipMode === 'kit') {
-    const w = WEAPON_OPTIONS.find(o => o.id === draft.weaponChoice)
-    if (w) {
-      const mod = w.stat === 'dex' ? dexMod : strMod
-      weapons.push({
-        name: w.name.split(' & ')[0], atkBonus: formatMod(prof + mod),
-        damage: `${w.die}${mod ? formatMod(mod) : ''} ${w.type}`,
-        notes: w.notes,
-      })
-    }
+    })
   }
   const diceN = cantripDiceCount(level)
   for (const name of draft.cantrips) {
@@ -230,13 +261,13 @@ function buildFinal(draft) {
     const dmg = `${diceN}${c.die} ${c.type}`
     if (c.kind === 'attack') {
       weapons.push({
-        name, atkBonus: formatMod(prof + chaMod), damage: dmg,
+        name, atkBonus: formatMod(prof + castMod), damage: dmg,
         notes: `Cantrip | ${c.range}${c.extra ? ` | ${c.extra}` : ''}`,
       })
     } else {
       weapons.push({
         name, atkBonus: `${c.save} save`, damage: dmg,
-        notes: `Cantrip | ${c.range} | DC ${8 + prof + chaMod}${c.extra ? ` | ${c.extra}` : ''}`,
+        notes: `Cantrip | ${c.range} | DC ${8 + prof + castMod}${c.extra ? ` | ${c.extra}` : ''}`,
       })
     }
   }
@@ -244,17 +275,15 @@ function buildFinal(draft) {
   // Equipment list + gold
   const equipment = []
   let gp = 0
-  if (draft.equipMode === 'kit') {
-    const w = WEAPON_OPTIONS.find(o => o.id === draft.weaponChoice)
-    const f = FOCUS_OPTIONS.find(o => o.id === draft.focusChoice)
-    const p = PACK_OPTIONS.find(o => o.id === draft.packChoice)
-    if (w) equipment.push({ name: w.name, description: '', isMagic: false })
-    equipment.push({ name: 'Dagger x2', description: '', isMagic: false })
+  if (withKit) {
+    const f = kit.focusOptions.find(o => o.id === draft.focusChoice)
+    const p = kit.packOptions.find(o => o.id === draft.packChoice)
+    if (kitWeapon) equipment.push({ name: kitWeapon.name, description: '', isMagic: false })
+    for (const item of kit.fixedItems) equipment.push({ name: item.name, description: item.description || '', isMagic: false })
     if (f) equipment.push({ name: f.name, description: '', isMagic: false })
     if (p) equipment.push({ name: p.name, description: p.contents, isMagic: false })
   } else {
     gp = draft.goldRolled?.total || 0
-    equipment.push({ name: 'Dagger x2', description: '', isMagic: false })
   }
 
   // Notes: backstory + background feature
@@ -272,14 +301,15 @@ function buildFinal(draft) {
     size: species?.size || 'Med',
     speed: species?.speed ?? 30,
     speciesTraits: species?.traits || [],
+    characterClass: draft.classId,
     level,
     abilityScores: scores,
-    ac: 10 + dexMod + (species?.acBonus || 0),
+    ac: startingAc(draft.classId, dexMod, { withKit, speciesAcBonus: species?.acBonus || 0 }),
     skillProfs,
     languages,
     knownCantrips: [...draft.cantrips],
     knownSpells: [...draft.spells],
-    chosenMetamagic: level >= 3 ? [...draft.metamagic] : [],
+    chosenMetamagic: cls.hasMetamagic && level >= 3 ? [...draft.metamagic] : [],
     weapons,
     equipment,
     currency: { cp: 0, sp: 0, gp, pp: 0 },
@@ -422,28 +452,32 @@ function StepIdentity({ draft, set }) {
 function StepClass({ draft, set }) {
   const species = getSpecies(draft)
   const background = getBackground(draft)
+  const cls = draftClass(draft)
   const granted = grantedSkills(draft)
   const extraSkills = species?.extraSkills || 0
   const langChoices = (species?.extraLanguages || 0) + (background?.extraLanguages || 0)
   const fixedLangs = species?.languages || ['Common']
-  const mmMax = draft.level >= 3 ? maxMetamagic(draft.level) : 0
+  const mmMax = cls.hasMetamagic && draft.level >= 3 ? maxMetamagic(draft.level) : 0
 
-  function toggleClassSkill(name) {
+  // One toggle for both pools: class slots fill first, then species extras.
+  // (Matters for bards, whose class list is every skill.)
+  function toggleSkill(name, isClassSkill) {
     if (granted.has(name)) return
-    set({
-      classSkills: draft.classSkills.includes(name)
-        ? draft.classSkills.filter(s => s !== name)
-        : draft.classSkills.length < SORCERER.skillChoices ? [...draft.classSkills, name] : draft.classSkills,
-    })
-  }
-
-  function toggleExtraSkill(name) {
-    if (granted.has(name) || draft.classSkills.includes(name)) return
-    set({
-      extraSkillPicks: draft.extraSkillPicks.includes(name)
-        ? draft.extraSkillPicks.filter(s => s !== name)
-        : draft.extraSkillPicks.length < extraSkills ? [...draft.extraSkillPicks, name] : draft.extraSkillPicks,
-    })
+    if (draft.classSkills.includes(name)) {
+      set({ classSkills: draft.classSkills.filter(s => s !== name) })
+      return
+    }
+    if (draft.extraSkillPicks.includes(name)) {
+      set({ extraSkillPicks: draft.extraSkillPicks.filter(s => s !== name) })
+      return
+    }
+    if (isClassSkill && draft.classSkills.length < cls.skillChoices) {
+      set({ classSkills: [...draft.classSkills, name] })
+      return
+    }
+    if (extraSkills > 0 && draft.extraSkillPicks.length < extraSkills) {
+      set({ extraSkillPicks: [...draft.extraSkillPicks, name] })
+    }
   }
 
   function toggleLang(lang) {
@@ -467,37 +501,40 @@ function StepClass({ draft, set }) {
     <div className="space-y-6">
       {/* Class cards */}
       <div className="card p-5">
-        <SectionLabel>Class</SectionLabel>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-violet-500/60 bg-violet-900/40 p-4 shadow-[0_0_12px_rgba(139,92,246,0.2)]">
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-white" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>🔮 Sorcerer</p>
-              <span className="text-[10px] bg-violet-700/50 border border-violet-500/40 text-violet-100 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Selected</span>
-            </div>
-            <p className="text-xs text-violet-200/70 mt-2 leading-relaxed">{SORCERER.blurb}</p>
-            <div className="mt-3 text-[11px] text-violet-300/60 space-y-1">
-              <p>Hit Die <span className="text-violet-200">d{SORCERER.hitDie}</span> · Saves <span className="text-violet-200">{SORCERER.saves.join(' & ')}</span></p>
-              <p>Subclass <span className="text-amber-300/90">{SORCERER.subclass}</span></p>
-            </div>
-          </div>
-          {['⚔️ Fighter', '🌿 Druid'].map(c => (
-            <div key={c} className="rounded-xl border border-violet-950/40 bg-violet-950/20 p-4 opacity-45">
-              <p className="font-bold text-violet-300/60" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>{c}</p>
-              <p className="text-[11px] text-violet-500/50 mt-2 italic">Coming soon — Sorcerer is the first supported class.</p>
-            </div>
-          ))}
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <SectionLabel>Class</SectionLabel>
+          <span className="text-[11px] text-violet-500/50 italic">Changing class resets skills, spells & equipment picks</span>
         </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {CLASS_IDS.map(id => {
+            const c = CLASSES[id]
+            return (
+              <PickCard key={id} selected={draft.classId === id} onClick={() => { if (draft.classId !== id) set(classChangePatch(id)) }}>
+                <div className="text-2xl mb-1.5">{c.icon}</div>
+                <p className="font-semibold text-white text-sm">{c.name}</p>
+                <p className="text-[11px] text-violet-300/50 mt-1 leading-snug">{c.blurb}</p>
+                <p className="text-[10px] text-violet-400/50 mt-2">
+                  d{c.hitDie} · {c.spellAbility.toUpperCase()} caster · Saves {c.saves.join('/')}
+                </p>
+                {c.subclass && <p className="text-[10px] text-amber-300/70 mt-0.5">{c.subclass}</p>}
+              </PickCard>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-[11px] text-violet-300/50">{cls.proficiencies}</p>
 
-        {/* Lunar phases showcase */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {Object.entries(LUNAR_PHASES).map(([key, ph]) => (
-            <div key={key} className="bg-violet-950/30 border border-violet-900/25 rounded-xl p-3">
-              <p className="text-xs font-semibold text-violet-200">{PHASE_ICONS[key]} {ph.name}</p>
-              <p className="text-[11px] text-violet-300/50 mt-1">Bonus: {ph.bonusSpells.join(', ')}</p>
-              <p className="text-[11px] text-slate-500 mt-1 leading-snug">{ph.tip}</p>
-            </div>
-          ))}
-        </div>
+        {/* Lunar phases showcase — sorcerer only */}
+        {cls.hasLunarPhases && (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {Object.entries(LUNAR_PHASES).map(([key, ph]) => (
+              <div key={key} className="bg-violet-950/30 border border-violet-900/25 rounded-xl p-3">
+                <p className="text-xs font-semibold text-violet-200">{PHASE_ICONS[key]} {ph.name}</p>
+                <p className="text-[11px] text-violet-300/50 mt-1">Bonus: {ph.bonusSpells.join(', ')}</p>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">{ph.tip}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Level */}
@@ -513,8 +550,14 @@ function StepClass({ draft, set }) {
           </div>
         </div>
         <p className="text-xs text-violet-300/50 mt-2">
-          Level {draft.level}: {CANTRIPS_KNOWN[draft.level - 1]} cantrips · {SPELLS_KNOWN[draft.level - 1]} spells known · max spell level {maxSpellLevelFor(draft.level)}
-          {draft.level >= 3 ? ` · ${maxMetamagic(draft.level)} metamagic` : ''}
+          Level {draft.level}: {draftCantripMax(draft)} cantrips · {
+            cls.spellsKnownType === 'prepared'
+              ? `level + ${cls.spellAbility.toUpperCase()} mod spells prepared`
+              : `${draftSpellMax(draft)} spells known`
+          }
+          {' '}· max spell level {draftMaxSpellLevel(draft)}
+          {cls.casterType === 'pact' ? ' (pact slots recharge on short rest)' : ''}
+          {mmMax > 0 ? ` · ${mmMax} metamagic` : ''}
           {draft.level >= 4 ? ` · +${asiPointsAvailable(draft.level)} ability points (ASI)` : ''}
         </p>
       </div>
@@ -524,24 +567,24 @@ function StepClass({ draft, set }) {
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
           <SectionLabel>Skill Proficiencies</SectionLabel>
           <div className="flex gap-2 flex-wrap">
-            <CountChip current={draft.classSkills.length} max={SORCERER.skillChoices} label="class picks" />
+            <CountChip current={draft.classSkills.length} max={cls.skillChoices} label="class picks" />
             {extraSkills > 0 && <CountChip current={draft.extraSkillPicks.length} max={extraSkills} label={`${species.name} picks`} />}
           </div>
         </div>
         <p className="text-xs text-violet-300/50 mb-3">
-          Pick {SORCERER.skillChoices} from the sorcerer list{extraSkills > 0 ? `, plus ${extraSkills} more from any skill (${species.name})` : ''}.
+          Pick {cls.skillChoices} from the {cls.name.toLowerCase()} list{extraSkills > 0 ? `, plus ${extraSkills} more from any skill (${species.name})` : ''}.
           Skills granted by your background{species?.skills?.length ? ' and species' : ''} are already locked in.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {ALL_SKILLS.map(sk => {
-            const isClassSkill = SORCERER.skillList.includes(sk.name)
+            const isClassSkill = cls.skillList.includes(sk.name)
             const isGranted = granted.has(sk.name)
             const isClassPicked = draft.classSkills.includes(sk.name)
             const isExtraPicked = draft.extraSkillPicks.includes(sk.name)
             const selected = isGranted || isClassPicked || isExtraPicked
             const canExtra = extraSkills > 0
             const clickable = !isGranted && (isClassSkill || canExtra)
-            const onClick = isClassSkill ? () => toggleClassSkill(sk.name) : canExtra ? () => toggleExtraSkill(sk.name) : undefined
+            const onClick = clickable ? () => toggleSkill(sk.name, isClassSkill) : undefined
             return (
               <button
                 key={sk.name}
@@ -559,9 +602,9 @@ function StepClass({ draft, set }) {
                 <span className="font-semibold">{sk.name}</span>
                 <span className="text-violet-500/50 ml-1 uppercase">{sk.ability}</span>
                 {isGranted && <span className="block text-[10px] text-amber-300/70 mt-0.5">✓ {species?.skills?.includes(sk.name) ? species.name : background?.name}</span>}
-                {isClassPicked && <span className="block text-[10px] text-violet-300/70 mt-0.5">✓ Sorcerer</span>}
+                {isClassPicked && <span className="block text-[10px] text-violet-300/70 mt-0.5">✓ {cls.name}</span>}
                 {isExtraPicked && <span className="block text-[10px] text-violet-300/70 mt-0.5">✓ {species?.name}</span>}
-                {!isGranted && !selected && isClassSkill && <span className="block text-[10px] text-violet-600/50 mt-0.5">Sorcerer list</span>}
+                {!isGranted && !selected && isClassSkill && <span className="block text-[10px] text-violet-600/50 mt-0.5">{cls.name} list</span>}
               </button>
             )
           })}
@@ -637,13 +680,17 @@ function StepAbilities({ draft, set }) {
   const base = getBaseScores(draft)
   const final = getFinalScores(draft)
   const species = getSpecies(draft)
+  const cls = draftClass(draft)
 
   const conMod = abilityMod(final.con)
   const dexMod = abilityMod(final.dex)
-  const chaMod = abilityMod(final.cha)
+  const castMod = abilityMod(final[cls.spellAbility] ?? 10)
   const prof = getProfBonus(draft.level)
-  const hp = getMaxHp(draft.level, conMod)
-  const ac = 10 + dexMod + (species?.acBonus || 0)
+  const hp = classMaxHp(draft.classId, draft.level, conMod)
+  const ac = startingAc(draft.classId, dexMod, { withKit: draft.equipMode === 'kit', speciesAcBonus: species?.acBonus || 0 })
+  const armorName = draft.equipMode === 'kit' && cls.kit.armor ? cls.kit.armor.name : null
+  const hints = { ...ABILITY_HINTS, cha: 'Deception, presence' }
+  hints[cls.spellAbility] = 'Your spellcasting ability ★'
 
   const pbSpent = pointBuyTotal(draft.pointBuyScores)
   const asiAvail = asiPointsAvailable(draft.level)
@@ -733,7 +780,7 @@ function StepAbilities({ draft, set }) {
               <div key={key} className="flex items-center gap-3 bg-violet-950/30 border border-violet-900/25 rounded-xl px-4 py-2.5">
                 <div className="w-32 flex-shrink-0">
                   <p className="text-sm font-semibold text-white">{ABILITY_NAMES[key]}</p>
-                  <p className="text-[10px] text-violet-400/40">{ABILITY_HINTS[key]}</p>
+                  <p className="text-[10px] text-violet-400/40">{hints[key]}</p>
                 </div>
 
                 {/* method-specific input */}
@@ -803,7 +850,7 @@ function StepAbilities({ draft, set }) {
             ))}
           </div>
         </div>
-        <p className="text-xs text-violet-300/50 mb-3">Your heritage grants ability bonuses — Charisma fuels your spellcasting.</p>
+        <p className="text-xs text-violet-300/50 mb-3">Your heritage grants ability bonuses — {ABILITY_NAMES[cls.spellAbility]} fuels your spellcasting.</p>
 
         {draft.originMode === '2-1' ? (
           <div className="space-y-2">
@@ -880,10 +927,10 @@ function StepAbilities({ draft, set }) {
         <SectionLabel>Derived Stats Preview</SectionLabel>
         <div className="flex flex-wrap gap-3">
           {[
-            { label: 'Hit Points', value: hp },
-            { label: 'Armor Class', value: ac, sub: species?.acBonus ? `incl. +${species.acBonus} ${species.name}` : '10 + DEX' },
-            { label: 'Spell Save DC', value: 8 + prof + chaMod },
-            { label: 'Spell Attack', value: formatMod(prof + chaMod) },
+            { label: 'Hit Points', value: hp, sub: `d${cls.hitDie} hit die` },
+            { label: 'Armor Class', value: ac, sub: armorName || (species?.acBonus ? `incl. +${species.acBonus} ${species.name}` : '10 + DEX') },
+            { label: 'Spell Save DC', value: 8 + prof + castMod, sub: cls.spellAbility.toUpperCase() },
+            { label: 'Spell Attack', value: formatMod(prof + castMod) },
             { label: 'Prof. Bonus', value: `+${prof}` },
             { label: 'Speed', value: `${species?.speed ?? 30} ft` },
           ].map(s => (
@@ -953,14 +1000,18 @@ function StepSpells({ draft, set }) {
   const [search, setSearch] = useState('')
   const [lvlFilter, setLvlFilter] = useState('all')
 
-  const cMax = CANTRIPS_KNOWN[draft.level - 1]
-  const sMax = SPELLS_KNOWN[draft.level - 1]
-  const maxLvl = maxSpellLevelFor(draft.level)
+  const cls = draftClass(draft)
+  const isSorcerer = draft.classId === 'sorcerer'
+  const classSpells = spellListFor(draft.classId)
+  const cMax = draftCantripMax(draft)
+  const sMax = draftSpellMax(draft)
+  const maxLvl = draftMaxSpellLevel(draft)
+  const isPrepared = cls.spellsKnownType === 'prepared'
 
-  const cantripList = useMemo(() => sorcererSpells.filter(s => s.level === 0), [])
+  const cantripList = useMemo(() => classSpells.filter(s => s.level === 0), [classSpells])
   const spellList = useMemo(
-    () => sorcererSpells.filter(s => s.level >= 1 && s.level <= maxLvl && !LUNAR_GRANTED.has(s.name)),
-    [maxLvl],
+    () => classSpells.filter(s => s.level >= 1 && s.level <= maxLvl && (!isSorcerer || !LUNAR_GRANTED.has(s.name))),
+    [classSpells, maxLvl, isSorcerer],
   )
 
   const q = search.trim().toLowerCase()
@@ -988,14 +1039,24 @@ function StepSpells({ draft, set }) {
 
   return (
     <div className="space-y-6">
-      {/* Lunar freebies callout */}
-      <div className="rounded-xl border border-amber-700/30 bg-amber-900/15 p-4">
-        <p className="text-xs text-amber-200/90 font-semibold mb-1">🌕 Lunar Sorcery bonus spells — always prepared, free of charge</p>
-        <p className="text-[11px] text-amber-200/60 leading-relaxed">
-          {Object.entries(LUNAR_PHASES).map(([k, p]) => `${PHASE_ICONS[k]} ${p.bonusSpells.join(', ')}`).join('  ·  ')}
-        </p>
-        <p className="text-[11px] text-amber-200/50 mt-1">They don't count against your spells known, so they're not listed below.</p>
-      </div>
+      {/* Lunar freebies callout — sorcerer only */}
+      {isSorcerer && (
+        <div className="rounded-xl border border-amber-700/30 bg-amber-900/15 p-4">
+          <p className="text-xs text-amber-200/90 font-semibold mb-1">🌕 Lunar Sorcery bonus spells — always prepared, free of charge</p>
+          <p className="text-[11px] text-amber-200/60 leading-relaxed">
+            {Object.entries(LUNAR_PHASES).map(([k, p]) => `${PHASE_ICONS[k]} ${p.bonusSpells.join(', ')}`).join('  ·  ')}
+          </p>
+          <p className="text-[11px] text-amber-200/50 mt-1">They don't count against your spells known, so they're not listed below.</p>
+        </div>
+      )}
+      {isPrepared && (
+        <div className="rounded-xl border border-violet-800/30 bg-violet-950/30 p-4">
+          <p className="text-xs text-violet-200/80 font-semibold mb-1">📖 {cls.name}s prepare spells</p>
+          <p className="text-[11px] text-violet-300/55 leading-relaxed">
+            Your limit is level + {cls.spellAbility.toUpperCase()} modifier ({sMax} right now) and you can swap your prepared list after any long rest — pick what you'd start the day with.
+          </p>
+        </div>
+      )}
 
       {/* Search + filter */}
       <div className="flex gap-2 flex-wrap items-center">
@@ -1046,7 +1107,7 @@ function StepSpells({ draft, set }) {
       {/* Levelled spells */}
       <div className="card p-5">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <SectionLabel>Spells Known <span className="normal-case tracking-normal text-violet-500/40">(up to level {maxLvl})</span></SectionLabel>
+          <SectionLabel>Spells {isPrepared ? 'Prepared' : 'Known'} <span className="normal-case tracking-normal text-violet-500/40">(up to level {maxLvl})</span></SectionLabel>
           <CountChip current={draft.spells.length} max={sMax} label="spells" />
         </div>
         <div className="space-y-1.5">
@@ -1069,9 +1130,13 @@ function StepSpells({ draft, set }) {
 // ── Step 4: Equipment ─────────────────────────────────────────────────────────
 
 function StepEquipment({ draft, set }) {
+  const cls = draftClass(draft)
+  const kit = cls.kit
+  const goldRoll = kit.goldRoll
+
   function rollGold() {
-    const rolls = Array.from({ length: GOLD_ROLL.dice }, () => Math.floor(Math.random() * GOLD_ROLL.sides) + 1)
-    const total = rolls.reduce((a, b) => a + b, 0) * GOLD_ROLL.multiplier
+    const rolls = Array.from({ length: goldRoll.dice }, () => Math.floor(Math.random() * goldRoll.sides) + 1)
+    const total = rolls.reduce((a, b) => a + b, 0) * goldRoll.multiplier
     set({ goldRolled: { rolls, total } })
   }
 
@@ -1093,35 +1158,39 @@ function StepEquipment({ draft, set }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <PickCard selected={draft.equipMode === 'kit'} onClick={() => set({ equipMode: 'kit' })}>
           <p className="font-semibold text-white">🎒 Take the starting kit</p>
-          <p className="text-[11px] text-violet-300/50 mt-1">The standard sorcerer loadout — weapon, focus, pack, and two daggers.</p>
+          <p className="text-[11px] text-violet-300/50 mt-1">The standard {cls.name.toLowerCase()} loadout — weapon, focus, pack{kit.armor ? ', armor' : ''}.</p>
         </PickCard>
         <PickCard selected={draft.equipMode === 'gold'} onClick={() => set({ equipMode: 'gold' })}>
           <p className="font-semibold text-white">💰 Roll for gold instead</p>
-          <p className="text-[11px] text-violet-300/50 mt-1">Roll {GOLD_ROLL.dice}d{GOLD_ROLL.sides} × {GOLD_ROLL.multiplier} gp and buy your own gear (avg. 75 gp).</p>
+          <p className="text-[11px] text-violet-300/50 mt-1">Roll {goldRoll.dice}d{goldRoll.sides} × {goldRoll.multiplier} gp and buy your own gear (avg. {Math.round(goldRoll.dice * (goldRoll.sides + 1) / 2) * goldRoll.multiplier} gp).</p>
         </PickCard>
       </div>
 
       {draft.equipMode === 'kit' ? (
         <div className="card p-5 space-y-5">
-          {radioGroup('Weapon', WEAPON_OPTIONS, 'weaponChoice', opt => (
+          {radioGroup('Weapon', kit.weaponOptions, 'weaponChoice', opt => (
             <>
               <p className="font-semibold text-sm text-white">{opt.name}</p>
-              <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.die} {opt.type} · {opt.notes}</p>
+              <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.die} {opt.type}{opt.notes ? ` · ${opt.notes}` : ''}</p>
             </>
           ))}
-          {radioGroup('Spellcasting Focus', FOCUS_OPTIONS, 'focusChoice', opt => (
+          {radioGroup('Spellcasting Focus', kit.focusOptions, 'focusChoice', opt => (
             <>
               <p className="font-semibold text-sm text-white">{opt.name}</p>
               <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.description}</p>
             </>
           ))}
-          {radioGroup('Adventuring Pack', PACK_OPTIONS, 'packChoice', opt => (
+          {radioGroup('Adventuring Pack', kit.packOptions, 'packChoice', opt => (
             <>
               <p className="font-semibold text-sm text-white">{opt.name}</p>
               <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.contents}</p>
             </>
           ))}
-          <p className="text-[11px] text-violet-500/50 italic">Plus two daggers — every sorcerer's insurance policy.</p>
+          {kit.fixedItems.length > 0 && (
+            <p className="text-[11px] text-violet-500/50 italic">
+              Also included: {kit.fixedItems.map(i => i.name).join(', ')}.
+            </p>
+          )}
         </div>
       ) : (
         <div className="card p-5 text-center space-y-4">
@@ -1131,7 +1200,7 @@ function StepEquipment({ draft, set }) {
                 {draft.goldRolled.rolls.map((r, i) => (
                   <span key={i} className="w-12 h-12 rounded-xl border-2 border-amber-600/50 bg-amber-900/25 flex items-center justify-center text-xl font-bold text-amber-200">{r}</span>
                 ))}
-                <span className="w-12 h-12 flex items-center justify-center text-violet-400/60 text-lg">×{GOLD_ROLL.multiplier}</span>
+                <span className="w-12 h-12 flex items-center justify-center text-violet-400/60 text-lg">×{goldRoll.multiplier}</span>
               </div>
               <p className="text-3xl font-bold text-amber-300" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>{draft.goldRolled.total} gp</p>
               <button type="button" onClick={rollGold} className="text-xs text-violet-400/60 hover:text-violet-200 underline underline-offset-2">Re-roll</button>
@@ -1142,7 +1211,7 @@ function StepEquipment({ draft, set }) {
               onClick={rollGold}
               className="px-6 py-3 rounded-xl bg-amber-700/40 border border-amber-500/50 text-amber-100 font-semibold hover:bg-amber-600/50 transition-all shadow-[0_0_12px_rgba(251,191,36,0.15)]"
             >
-              🎲 Roll {GOLD_ROLL.dice}d{GOLD_ROLL.sides} × {GOLD_ROLL.multiplier} gp
+              🎲 Roll {goldRoll.dice}d{goldRoll.sides} × {goldRoll.multiplier} gp
             </button>
           )}
         </div>
@@ -1156,12 +1225,14 @@ function StepEquipment({ draft, set }) {
 function StepReview({ draft }) {
   const problem = validateAll(draft)
   const cfg = buildFinal(draft)
+  const cls = draftClass(draft)
   const conMod = abilityMod(cfg.abilityScores.con)
-  const chaMod = abilityMod(cfg.abilityScores.cha)
+  const castMod = abilityMod(cfg.abilityScores[cls.spellAbility] ?? 10)
   const prof = getProfBonus(cfg.level)
-  const hp = getMaxHp(cfg.level, conMod)
-  const slots = getSpellSlotMax(cfg.level)
+  const hp = classMaxHp(cfg.characterClass, cfg.level, conMod)
+  const slots = classSlotMax(cfg.characterClass, cfg.level)
   const slotStr = Object.entries(slots).filter(([, n]) => n > 0).map(([l, n]) => `L${l}×${n}`).join(' · ')
+    + (cls.casterType === 'pact' ? ' (short-rest recharge)' : '')
 
   return (
     <div className="space-y-6">
@@ -1181,8 +1252,8 @@ function StepReview({ draft }) {
             <p className="text-sm text-slate-300 mt-1">
               <span className="text-violet-300">{cfg.species}</span>
               <span className="text-violet-500/50 mx-1.5">·</span>
-              <span className="text-violet-200">Sorcerer</span>
-              <span className="text-slate-500 text-xs"> (Lunar)</span>
+              <span className="text-violet-200">{cls.name}</span>
+              {cls.subclassShort && <span className="text-slate-500 text-xs"> ({cls.subclassShort})</span>}
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-amber-300/80">Level {cfg.level}</span>
             </p>
@@ -1191,8 +1262,8 @@ function StepReview({ draft }) {
           <div className="flex flex-wrap gap-2">
             {[
               { label: 'HP', value: hp }, { label: 'AC', value: cfg.ac },
-              { label: 'Speed', value: cfg.speed }, { label: 'Save DC', value: 8 + prof + chaMod },
-              { label: 'Spell Atk', value: formatMod(prof + chaMod) },
+              { label: 'Speed', value: cfg.speed }, { label: 'Save DC', value: 8 + prof + castMod },
+              { label: 'Spell Atk', value: formatMod(prof + castMod) },
             ].map(s => (
               <div key={s.label} className="bg-violet-950/40 border border-violet-800/30 rounded-xl px-3 py-2 text-center min-w-[64px]">
                 <p className="text-lg font-bold text-white tabular-nums">{s.value}</p>
@@ -1325,6 +1396,7 @@ export default function CreatePage() {
       return
     }
     const cfg = buildFinal(draft)
+    const cls = draftClass(draft)
     const id = generateCharacterId(cfg.characterName, characters.map(c => c.id))
     const state = createCharacterState(cfg)
     persistNewCharacter(id, state)
@@ -1332,7 +1404,7 @@ export default function CreatePage() {
       id,
       name: cfg.characterName,
       race: cfg.species,
-      characterClass: 'Sorcerer (Lunar)',
+      characterClass: cls.subclassShort ? `${cls.name} (${cls.subclassShort})` : cls.name,
       accent: draft.accent,
     })
     try { localStorage.removeItem(DRAFT_KEY) } catch {}

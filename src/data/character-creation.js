@@ -266,12 +266,22 @@ export const GOLD_ROLL = { dice: 3, sides: 4, multiplier: 10 }
 // ── Attack cantrips → auto-filled weapon table rows ───────────────────────────
 // kind 'attack' rows get the spell attack bonus; 'save' rows show the save instead.
 export const ATTACK_CANTRIPS = {
-  'Fire Bolt':      { die: 'd10', type: 'fire',      range: '120 ft', kind: 'attack' },
-  'Ray of Frost':   { die: 'd8',  type: 'cold',      range: '60 ft',  kind: 'attack', extra: 'Speed −10 ft' },
-  'Chill Touch':    { die: 'd8',  type: 'necrotic',  range: '120 ft', kind: 'attack', extra: 'Target can\'t regain HP' },
-  'Shocking Grasp': { die: 'd8',  type: 'lightning', range: 'Touch',  kind: 'attack', extra: 'No reactions until next turn' },
-  'Acid Splash':    { die: 'd6',  type: 'acid',      range: '60 ft',  kind: 'save', save: 'DEX' },
-  'Poison Spray':   { die: 'd12', type: 'poison',    range: '10 ft',  kind: 'save', save: 'CON' },
+  'Fire Bolt':       { die: 'd10', type: 'fire',      range: '120 ft', kind: 'attack' },
+  'Ray of Frost':    { die: 'd8',  type: 'cold',      range: '60 ft',  kind: 'attack', extra: 'Speed −10 ft' },
+  'Chill Touch':     { die: 'd8',  type: 'necrotic',  range: '120 ft', kind: 'attack', extra: 'Target can\'t regain HP' },
+  'Shocking Grasp':  { die: 'd8',  type: 'lightning', range: 'Touch',  kind: 'attack', extra: 'No reactions until next turn' },
+  'Acid Splash':     { die: 'd6',  type: 'acid',      range: '60 ft',  kind: 'save', save: 'DEX' },
+  'Poison Spray':    { die: 'd12', type: 'poison',    range: '10 ft',  kind: 'save', save: 'CON' },
+  'Eldritch Blast':  { die: 'd10', type: 'force',     range: '120 ft', kind: 'attack', extra: 'One attack roll per beam' },
+  'Sacred Flame':    { die: 'd8',  type: 'radiant',   range: '60 ft',  kind: 'save', save: 'DEX', extra: 'No cover benefit' },
+  'Toll the Dead':   { die: 'd8',  type: 'necrotic',  range: '60 ft',  kind: 'save', save: 'WIS', extra: 'd12 if target is damaged' },
+  'Word of Radiance':{ die: 'd6',  type: 'radiant',   range: '5 ft',   kind: 'save', save: 'CON' },
+  'Vicious Mockery': { die: 'd4',  type: 'psychic',   range: '60 ft',  kind: 'save', save: 'WIS', extra: 'Disadvantage on next attack' },
+  'Produce Flame':   { die: 'd8',  type: 'fire',      range: '30 ft',  kind: 'attack' },
+  'Thorn Whip':      { die: 'd6',  type: 'piercing',  range: '30 ft',  kind: 'attack', extra: 'Pull target 10 ft closer' },
+  'Frostbite':       { die: 'd6',  type: 'cold',      range: '60 ft',  kind: 'save', save: 'CON', extra: 'Disadvantage on next weapon attack' },
+  'Primal Savagery': { die: 'd10', type: 'acid',      range: 'Touch',  kind: 'attack' },
+  'Mind Sliver':     { die: 'd6',  type: 'psychic',   range: '60 ft',  kind: 'save', save: 'INT', extra: '−1d4 on target\'s next save' },
 }
 
 // Cantrip damage dice count scales at levels 5 / 11 / 17

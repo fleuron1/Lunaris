@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
-import spellsData from '../data/sorcerer-spells.json'
 import metamagicData from '../data/metamagic.json'
 import featsData from '../data/feats.json'
 import { SKILLS } from '../data/annabelle.js'
 import {
-  SPELL_SLOTS_TABLE, LEVEL_FEATURES, CANTRIPS_KNOWN, SPELLS_KNOWN,
   SORCERY_POINTS, XP_THRESHOLDS, maxMetamagic, getProfBonus,
 } from '../data/sorcerer-progression.js'
+import {
+  getClass, classSlotMax, cantripsKnownFor, spellsLimitFor,
+  maxCastableSpellLevel, spellListFor, spellsLimitLabel,
+} from '../data/classes.js'
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 const ABILITY_LABELS = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }
@@ -46,6 +48,7 @@ const TABS = ['Character', 'Stats', 'Inventory', 'Skills & Languages', 'Spells',
 function CharacterTab({
   level, xp, ac, speed, characterName, background, notes,
   setLevel, setXp, setAc, setSpeed, setCharacterName, setBackground, setNotes,
+  classLabel,
 }) {
   const [xpInput, setXpInput] = useState(String(xp ?? 0))
   const nextXp    = XP_THRESHOLDS[level] ?? null
@@ -82,7 +85,7 @@ function CharacterTab({
           <button onClick={() => setLevel(Math.max(1, level - 1))} className={BTN_SM} disabled={level <= 1}>−</button>
           <div className="flex-1 text-center">
             <span className="text-5xl font-bold text-violet-300">{level}</span>
-            <p className="text-slate-400 text-sm mt-1">Lunar Sorcerer</p>
+            <p className="text-slate-400 text-sm mt-1">{classLabel || 'Lunar Sorcerer'}</p>
           </div>
           <button onClick={() => setLevel(Math.min(20, level + 1))} className={BTN_SM} disabled={level >= 20}>+</button>
         </div>
@@ -412,15 +415,20 @@ const SCHOOL_COLORS = {
   Transmutation: 'text-yellow-400', Evocation: 'text-orange-400',
 }
 
-function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetSpells }) {
+function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetSpells, characterClass, castMod }) {
   const [search,       setSearch]       = useState('')
   const [filterLevel,  setFilterLevel]  = useState('all')
   const [filterKnown,  setFilterKnown]  = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
 
-  const maxSpellLevel = SPELL_SLOTS_TABLE[level]?.findLastIndex(n => n > 0) + 1 || 2
-  const cantripMax  = CANTRIPS_KNOWN[level - 1]
-  const spellMax    = SPELLS_KNOWN[level - 1]
+  const classId   = characterClass || 'sorcerer'
+  const cls       = getClass(classId)
+  const spellsData = spellListFor(classId)
+  const limitLabel = spellsLimitLabel(classId) === 'prepared' ? 'Prepared' : 'Known'
+
+  const maxSpellLevel = maxCastableSpellLevel(classId, level)
+  const cantripMax  = cantripsKnownFor(classId, level)
+  const spellMax    = spellsLimitFor(classId, level, castMod || 0)
   const cantripsFull = knownCantrips.length >= cantripMax
   const spellsFull   = knownSpells.length   >= spellMax
 
@@ -437,7 +445,7 @@ function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetS
       if (!isCan && !knownSpells.includes(s.name))   return false
     }
     return true
-  }), [search, filterLevel, filterKnown, knownSpells, knownCantrips, maxSpellLevel])
+  }), [spellsData, search, filterLevel, filterKnown, knownSpells, knownCantrips, maxSpellLevel])
 
   const grouped = useMemo(() => {
     const g = {}
@@ -456,19 +464,27 @@ function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetS
   return (
     <div className="space-y-4">
 
-      {/* Lunar note */}
-      <div className="flex items-center gap-2 bg-violet-950/40 border border-violet-800/30 rounded-lg px-3 py-2 text-xs text-violet-300/60">
-        <span>🌙</span>
-        <span>Lunar bonus spells (Cure Wounds, Moonbeam, etc.) are always prepared by your subclass and don't count here.</span>
-      </div>
+      {/* Lunar note — sorcerer subclass only */}
+      {classId === 'sorcerer' && (
+        <div className="flex items-center gap-2 bg-violet-950/40 border border-violet-800/30 rounded-lg px-3 py-2 text-xs text-violet-300/60">
+          <span>🌙</span>
+          <span>Lunar bonus spells (Cure Wounds, Moonbeam, etc.) are always prepared by your subclass and don't count here.</span>
+        </div>
+      )}
+      {cls.spellsKnownType === 'prepared' && (
+        <div className="flex items-center gap-2 bg-violet-950/40 border border-violet-800/30 rounded-lg px-3 py-2 text-xs text-violet-300/60">
+          <span>📖</span>
+          <span>{cls.name}s prepare spells: your limit is level + {cls.spellAbility.toUpperCase()} modifier. Swap freely after a long rest.</span>
+        </div>
+      )}
 
       {/* Level overview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Prof. Bonus',    value: `+${getProfBonus(level)}` },
-          { label: 'Cantrips Known', value: CANTRIPS_KNOWN[level - 1] },
-          { label: 'Spells Known',   value: SPELLS_KNOWN[level - 1]   },
-          { label: 'Sorcery Points', value: SORCERY_POINTS[level - 1] },
+          { label: 'Cantrips Known', value: cantripMax },
+          { label: `Spells ${limitLabel}`, value: spellMax },
+          ...(cls.hasSorceryPoints ? [{ label: 'Sorcery Points', value: SORCERY_POINTS[level - 1] }] : []),
         ].map(({ label, value }) => (
           <Card key={label} className="p-3 text-center">
             <p className="text-2xl font-bold text-amber-300">{value}</p>
@@ -479,12 +495,12 @@ function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetS
 
       {/* Spell slots */}
       <Card className="p-5">
-        <SH>Spell Slots at Level {level}</SH>
+        <SH>Spell Slots at Level {level}{cls.casterType === 'pact' ? ' (Pact Magic — recharge on short rest)' : ''}</SH>
         <div className="flex flex-wrap gap-2">
-          {(SPELL_SLOTS_TABLE[level] || []).map((count, i) => count > 0 && (
-            <div key={i} className="bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-2 text-center">
+          {Object.entries(classSlotMax(classId, level)).map(([lvl, count]) => count > 0 && (
+            <div key={lvl} className="bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-2 text-center">
               <p className="text-lg font-bold text-violet-300">{count}</p>
-              <p className="text-xs text-violet-300/50">{['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'][i]}</p>
+              <p className="text-xs text-violet-300/50">{['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'][lvl - 1]}</p>
             </div>
           ))}
         </div>
@@ -503,7 +519,7 @@ function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetS
           <p className={`text-2xl font-bold ${spellsFull ? 'text-amber-400' : 'text-violet-400'}`}>
             {knownSpells.length} <span className="text-slate-500 text-lg">/ {spellMax}</span>
           </p>
-          <p className="text-xs text-violet-300/50 mt-1">Spells Known</p>
+          <p className="text-xs text-violet-300/50 mt-1">Spells {limitLabel}</p>
           {spellsFull && <p className="text-[10px] text-amber-400/70 mt-0.5">Full — remove one to swap</p>}
         </Card>
       </div>
@@ -528,10 +544,12 @@ function SpellsTab({ level, knownSpells, knownCantrips, toggleKnownSpell, resetS
           onClick={() => setFilterKnown(v => !v)}
           className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${filterKnown ? 'bg-violet-700 border-violet-600 text-white' : 'bg-[#060c20] border-violet-950/40 text-slate-400 hover:text-slate-200 hover:bg-violet-950/30'}`}
         >Known Only</button>
-        <button
-          onClick={handleReset} onBlur={() => setConfirmReset(false)}
-          className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${confirmReset ? 'bg-red-900/50 border-red-700/40 text-red-300' : 'bg-[#060c20] border-violet-950/40 text-slate-400 hover:text-slate-200 hover:bg-violet-950/30'}`}
-        >{confirmReset ? '⚠ Confirm Reset?' : 'Reset'}</button>
+        {classId === 'sorcerer' && (
+          <button
+            onClick={handleReset} onBlur={() => setConfirmReset(false)}
+            className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${confirmReset ? 'bg-red-900/50 border-red-700/40 text-red-300' : 'bg-[#060c20] border-violet-950/40 text-slate-400 hover:text-slate-200 hover:bg-violet-950/30'}`}
+          >{confirmReset ? '⚠ Confirm Reset?' : 'Reset'}</button>
+        )}
       </div>
 
       {/* Spell list */}
@@ -758,15 +776,21 @@ export default function EditPage({
   skillProfs, setSkillProf,
   characterName, background, notes,
   setCharacterName, setBackground, setNotes,
+  characterClass, subclass, classInfo,
 }) {
   const [tab, setTab] = useState('Character')
+
+  const cls = classInfo || getClass(characterClass || 'sorcerer')
+  const tabs = cls.hasMetamagic ? TABS : TABS.filter(t => t !== 'Metamagic')
+  const classLabel = subclass ? `${subclass} ${cls.name}` : cls.name
+  const castMod = mod(abilityScores?.[cls.spellAbility] ?? 10)
 
   return (
     <div className="max-w-[1380px] mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4">
 
       {/* Tab bar */}
       <div className="flex gap-1 flex-wrap">
-        {TABS.map(t => (
+        {tabs.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -787,6 +811,7 @@ export default function EditPage({
           characterName={characterName} background={background} notes={notes}
           setLevel={setLevel} setXp={setXp} setAc={setAc} setSpeed={setSpeed}
           setCharacterName={setCharacterName} setBackground={setBackground} setNotes={setNotes}
+          classLabel={classLabel}
         />
       )}
       {tab === 'Stats' && (
@@ -808,9 +833,10 @@ export default function EditPage({
         <SpellsTab
           level={level} knownSpells={knownSpells} knownCantrips={knownCantrips}
           toggleKnownSpell={toggleKnownSpell} resetSpells={resetSpells}
+          characterClass={characterClass} castMod={castMod}
         />
       )}
-      {tab === 'Metamagic' && (
+      {tab === 'Metamagic' && cls.hasMetamagic && (
         <MetamagicTab level={level} chosenMetamagic={chosenMetamagic} toggleMetamagic={toggleMetamagic} />
       )}
       {tab === 'Feats' && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { SPELLS as LUNAR_SPELLS, COMBAT, LUNAR_PHASES } from '../data/annabelle.js'
-import sorcererSpells from '../data/sorcerer-spells.json'
+import { spellListFor } from '../data/classes.js'
 
 const LEVEL_LABELS = { C: 'Cantrip', 1: '1st Level', 2: '2nd Level', 3: '3rd Level', 4: '4th Level', 5: '5th Level', 6: '6th Level', 7: '7th Level', 8: '8th Level', 9: '9th Level' }
 
@@ -13,13 +13,14 @@ const PHASE_STYLES = {
 const PHASE_ICONS = { full: '🌕', new: '🌑', crescent: '🌙' }
 
 // Curated spells from annabelle.js — hand-written notes, lunar tags, and dice
-// fields (rollBase/upcastDie) that the JSON list doesn't have
+// fields (rollBase/upcastDie) that the JSON lists don't have
 const CURATED_MAP = {}
 LUNAR_SPELLS.forEach(s => { CURATED_MAP[s.name] = s })
 
-// Convert sorcerer-spells.json entry to the shape SpellCard expects, layering
-// curated fields on top when we have them so dice rolling works for all of them
-function adaptSpell(s) {
+// Convert a spell-list JSON entry to the shape SpellCard expects, layering
+// curated fields on top when we have them so dice rolling works.
+// The lunar tag only applies to sorcerers (it drives "always prepared" UI).
+function adaptSpell(s, includeLunar) {
   const curated = CURATED_MAP[s.name]
   return {
     name: s.name,
@@ -34,19 +35,27 @@ function adaptSpell(s) {
     notes: curated?.notes ?? s.description,
     description: s.description || curated?.description,
     upcast: s.atHigherLevels || curated?.upcast || null,
-    lunar: curated?.lunar,
+    lunar: includeLunar ? curated?.lunar : undefined,
     rollBase: curated?.rollBase,
     upcastDie: curated?.upcastDie,
   }
 }
 
-// Full spell list: every sorcerer spell from the JSON (enriched with curated
-// data), plus curated spells not on the sorcerer list (lunar bonus spells)
-const JSON_NAMES = new Set(sorcererSpells.map(s => s.name))
-const ALL_SPELLS = [
-  ...sorcererSpells.map(adaptSpell),
-  ...LUNAR_SPELLS.filter(s => !JSON_NAMES.has(s.name)),
-]
+// Per-class spell list. Sorcerers also get the curated lunar bonus spells that
+// aren't on their class list (always-prepared subclass spells).
+const SPELL_LIST_CACHE = {}
+function getAllSpells(classId = 'sorcerer') {
+  if (SPELL_LIST_CACHE[classId]) return SPELL_LIST_CACHE[classId]
+  const baseList = spellListFor(classId)
+  const isSorcerer = classId === 'sorcerer'
+  let list = baseList.map(s => adaptSpell(s, isSorcerer))
+  if (isSorcerer) {
+    const names = new Set(baseList.map(s => s.name))
+    list = [...list, ...LUNAR_SPELLS.filter(s => !names.has(s.name))]
+  }
+  SPELL_LIST_CACHE[classId] = list
+  return list
+}
 
 // ── Spell Detail Modal ────────────────────────────────────────────────────────
 
@@ -400,11 +409,12 @@ function SpellCard({ spell, concentration, setConcentration, lunarPhase, onOpen,
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell, rollDice }) {
+export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell, rollDice, characterClass, spellcastingAbility, classInfo }) {
   const [selectedSpell, setSelectedSpell] = useState(null)
+  const isLunarSorcerer = classInfo ? !!classInfo.hasLunarPhases : true
 
   const grouped = {}
-  ALL_SPELLS.forEach(spell => {
+  getAllSpells(characterClass || 'sorcerer').forEach(spell => {
     const isCantrip = spell.level === 'C'
     // Lunar bonus spells are always shown; other spells only if known
     const show = spell.lunar
@@ -445,7 +455,7 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
             <div className="flex gap-5 mt-1.5 text-sm">
               <div>
                 <span className="text-violet-300/50 text-xs uppercase tracking-wider">Ability </span>
-                <span className="font-bold text-violet-300">{COMBAT.spellcastingAbility}</span>
+                <span className="font-bold text-violet-300">{(spellcastingAbility || COMBAT.spellcastingAbility || 'cha').toUpperCase()}</span>
               </div>
               <div>
                 <span className="text-violet-300/50 text-xs uppercase tracking-wider">Save DC </span>
@@ -494,19 +504,21 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
         </div>
       )}
 
-      {/* Phase legend */}
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(LUNAR_PHASES).map(([key, p]) => (
-          <span
-            key={key}
-            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-              lunarPhase === key ? PHASE_STYLES[key] : 'bg-violet-950/20 border-violet-900/25 text-violet-400/40'
-            }`}
-          >
-            {PHASE_ICONS[key]} <span className="font-semibold">{p.name}:</span> {p.bonusSpells.join(', ')}
-          </span>
-        ))}
-      </div>
+      {/* Phase legend — lunar sorcerers only */}
+      {isLunarSorcerer && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(LUNAR_PHASES).map(([key, p]) => (
+            <span
+              key={key}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                lunarPhase === key ? PHASE_STYLES[key] : 'bg-violet-950/20 border-violet-900/25 text-violet-400/40'
+              }`}
+            >
+              {PHASE_ICONS[key]} <span className="font-semibold">{p.name}:</span> {p.bonusSpells.join(', ')}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Spell levels */}
       {levelOrder.map(level => {

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ABILITIES, SPELLS, SKILLS } from '../data/annabelle.js'
-import {
-  getSpellSlotMax, getMaxHp, getProfBonus, SORCERY_POINTS, maxMetamagic,
-} from '../data/sorcerer-progression.js'
+import { getProfBonus, SORCERY_POINTS, maxMetamagic } from '../data/sorcerer-progression.js'
+import { getClass, classMaxHp, classSlotMax } from '../data/classes.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
 const LEGACY_KEY = 'annabelle-sheet-v2' // migration: old single-character key
@@ -21,19 +20,19 @@ SKILLS.filter(s => s.proficient).forEach(s => { DEFAULT_SKILL_PROFS[s.name] = 'p
 
 function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 
-function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
-  const slotMax = getSpellSlotMax(level)
+function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES, classId = 'sorcerer') {
+  const slotMax = classSlotMax(classId, level)
   const slots = {}
   for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
   const conMod = Math.floor((abilities.con - 10) / 2)
   return {
     // Combat tracking
-    currentHp: getMaxHp(level, conMod),
+    currentHp: classMaxHp(classId, level, conMod),
     tempHp: 0,
     hitDiceSpent: 0,
     deathSaves: { successes: 0, failures: 0 },
     spellSlots: slots,
-    sorceryPoints: SORCERY_POINTS[level - 1],
+    sorceryPoints: classId === 'sorcerer' ? SORCERY_POINTS[level - 1] : 0,
     heroicInspiration: false,
     lunarPhase: 'full',
     concentration: null,
@@ -55,7 +54,8 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES) {
     // SheetPage falls back to the static Warforged data when speciesTraits is null)
     species: 'Warforged',
     size: 'Med',
-    subclass: 'Lunar',
+    characterClass: classId,
+    subclass: getClass(classId).subclassShort,
     speciesTraits: null,
     // Skill proficiencies: { 'Deception': 'proficient' | 'expert' }
     skillProfs: { ...DEFAULT_SKILL_PROFS },
@@ -95,8 +95,15 @@ function loadState(characterId) {
     }
     if (!raw) return buildDefaults()
     const saved = JSON.parse(raw)
-    const merged = { ...buildDefaults(saved.level || 4, saved.abilityScores || DEFAULT_ABILITIES), ...saved }
-    merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+    const merged = {
+      ...buildDefaults(saved.level || 4, saved.abilityScores || DEFAULT_ABILITIES, saved.characterClass || 'sorcerer'),
+      ...saved,
+    }
+    // Lunar bonus spells are subclass-granted for SORCERERS only — other classes
+    // (e.g. a cleric with Cure Wounds) must keep these in their known spells.
+    if ((merged.characterClass || 'sorcerer') === 'sorcerer') {
+      merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+    }
     return merged
   } catch {
     return buildDefaults()
@@ -113,13 +120,14 @@ function saveState(characterId, state) {
 export function createCharacterState({
   characterName, background = '', notes = '',
   species = 'Unknown', size = 'Med', speed = 30, speciesTraits = [],
+  characterClass = 'sorcerer',
   level = 1, abilityScores, ac,
   skillProfs = {}, languages = ['Common'],
   knownCantrips = [], knownSpells = [], chosenMetamagic = [],
   weapons = [], equipment = [], currency = { cp: 0, sp: 0, gp: 0, pp: 0 },
   xp = 0,
 }) {
-  const base = buildDefaults(level, abilityScores)
+  const base = buildDefaults(level, abilityScores, characterClass)
   const dexMod = Math.floor(((abilityScores?.dex ?? 10) - 10) / 2)
   return {
     ...base,
@@ -130,7 +138,8 @@ export function createCharacterState({
     size,
     speed,
     speciesTraits,
-    subclass: 'Lunar',
+    characterClass,
+    subclass: getClass(characterClass).subclassShort,
     ac: ac ?? 10 + dexMod,
     xp,
     skillProfs,
@@ -165,7 +174,9 @@ export function useCharacterState(characterId = 'annabelle') {
       if (!cloudData) return
       setState(prev => {
         const merged = { ...prev, ...cloudData }
-        merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+        if ((merged.characterClass || 'sorcerer') === 'sorcerer') {
+          merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+        }
         saveState(characterId, merged)
         return merged
       })
@@ -192,7 +203,7 @@ export function useCharacterState(characterId = 'annabelle') {
   function adjustHp(delta) {
     setState(prev => {
       const conMod = Math.floor((prev.abilityScores.con - 10) / 2)
-      const maxHp = getMaxHp(prev.level, conMod)
+      const maxHp = classMaxHp(prev.characterClass, prev.level, conMod)
       const hp = Math.max(0, Math.min(maxHp, prev.currentHp + delta))
       const next = { ...prev, currentHp: hp }
       if (delta > 0 && prev.currentHp === 0) next.deathSaves = { successes: 0, failures: 0 }
@@ -243,13 +254,14 @@ export function useCharacterState(characterId = 'annabelle') {
   }
 
   function rollHitDie() {
-    const { hitDiceSpent, level, abilityScores, currentHp } = state
+    const { hitDiceSpent, level, abilityScores, currentHp, characterClass } = state
     if (hitDiceSpent >= level) return null
-    const conMod = Math.floor((abilityScores.con - 10) / 2)
-    const maxHp  = getMaxHp(level, conMod)
-    const die    = Math.floor(Math.random() * 6) + 1  // d6 sorcerer
-    const heal   = Math.max(1, die + conMod)
-    const total  = Math.min(maxHp - currentHp, heal)
+    const conMod  = Math.floor((abilityScores.con - 10) / 2)
+    const maxHp   = classMaxHp(characterClass, level, conMod)
+    const hitDie  = getClass(characterClass).hitDie
+    const die     = Math.floor(Math.random() * hitDie) + 1
+    const heal    = Math.max(1, die + conMod)
+    const total   = Math.min(maxHp - currentHp, heal)
     setState(prev => ({
       ...prev,
       hitDiceSpent: prev.hitDiceSpent + 1,
@@ -269,21 +281,30 @@ export function useCharacterState(characterId = 'annabelle') {
     })
   }
 
-  function shortRest() {}
+  // Pact magic (warlock) slots recharge on a short rest
+  function shortRest() {
+    setState(prev => {
+      if (getClass(prev.characterClass).casterType !== 'pact') return prev
+      const slotMax = classSlotMax(prev.characterClass, prev.level)
+      const slots = {}
+      for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
+      return { ...prev, spellSlots: slots }
+    })
+  }
 
   function longRest() {
     setState(prev => {
-      const slotMax = getSpellSlotMax(prev.level)
+      const slotMax = classSlotMax(prev.characterClass, prev.level)
       const slots = {}
       for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
       const conMod = Math.floor((prev.abilityScores.con - 10) / 2)
       return {
         ...prev,
-        currentHp: getMaxHp(prev.level, conMod),
+        currentHp: classMaxHp(prev.characterClass, prev.level, conMod),
         tempHp: 0, hitDiceSpent: 0,
         deathSaves: { successes: 0, failures: 0 },
         spellSlots: slots,
-        sorceryPoints: SORCERY_POINTS[prev.level - 1],
+        sorceryPoints: prev.characterClass === 'sorcerer' ? SORCERY_POINTS[prev.level - 1] : 0,
         heroicInspiration: false, concentration: null,
       }
     })
@@ -292,20 +313,21 @@ export function useCharacterState(characterId = 'annabelle') {
   // ── Level & Advancement ─────────────────────────────────
   function setLevel(newLevel) {
     setState(prev => {
-      const slotMax = getSpellSlotMax(newLevel)
+      const slotMax = classSlotMax(prev.characterClass, newLevel)
       const slots = {}
       for (let i = 1; i <= 9; i++) {
         slots[i] = { total: slotMax[i], expended: Math.min(prev.spellSlots[i]?.expended || 0, slotMax[i]) }
       }
       const conMod = Math.floor((prev.abilityScores.con - 10) / 2)
-      const newMaxHp = getMaxHp(newLevel, conMod)
-      const oldMaxHp = getMaxHp(prev.level, conMod)
+      const newMaxHp = classMaxHp(prev.characterClass, newLevel, conMod)
+      const oldMaxHp = classMaxHp(prev.characterClass, prev.level, conMod)
+      const maxSp = prev.characterClass === 'sorcerer' ? SORCERY_POINTS[newLevel - 1] : 0
       return {
         ...prev,
         level: newLevel,
         spellSlots: slots,
         // Keep however many points are currently unspent, capped at the new max.
-        sorceryPoints: Math.min(prev.sorceryPoints ?? SORCERY_POINTS[newLevel - 1], SORCERY_POINTS[newLevel - 1]),
+        sorceryPoints: Math.min(prev.sorceryPoints ?? maxSp, maxSp),
         currentHp: Math.min(prev.currentHp + (newMaxHp - oldMaxHp), newMaxHp),
       }
     })
@@ -404,8 +426,9 @@ export function useCharacterState(characterId = 'annabelle') {
   }
 
   // ── Derived values ────────────────────────────────────────
+  const cfg = getClass(state.characterClass)
   const conMod = Math.floor((state.abilityScores.con - 10) / 2)
-  const chaMod = Math.floor((state.abilityScores.cha - 10) / 2)
+  const castMod = Math.floor(((state.abilityScores[cfg.spellAbility] ?? 10) - 10) / 2)
   const profBonus = getProfBonus(state.level)
 
   return {
@@ -429,12 +452,15 @@ export function useCharacterState(characterId = 'annabelle') {
     // Sync
     syncStatus,
     // Derived
-    maxHp: getMaxHp(state.level, conMod),
+    maxHp: classMaxHp(state.characterClass, state.level, conMod),
     profBonus,
-    spellSlotMax: getSpellSlotMax(state.level),
-    maxSorceryPoints: SORCERY_POINTS[state.level - 1],
-    maxMetamagic: maxMetamagic(state.level),
-    spellSaveDC: 8 + profBonus + chaMod,
-    spellAttackBonus: profBonus + chaMod,
+    spellSlotMax: classSlotMax(state.characterClass, state.level),
+    maxSorceryPoints: state.characterClass === 'sorcerer' ? SORCERY_POINTS[state.level - 1] : 0,
+    maxMetamagic: state.characterClass === 'sorcerer' ? maxMetamagic(state.level) : 0,
+    spellSaveDC: 8 + profBonus + castMod,
+    spellAttackBonus: profBonus + castMod,
+    hitDiceType: cfg.hitDie,
+    spellcastingAbility: cfg.spellAbility,
+    classInfo: cfg,
   }
 }
