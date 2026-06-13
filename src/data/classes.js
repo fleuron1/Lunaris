@@ -10,8 +10,23 @@ import druidSpells from './druid-spells.json'
 import warlockSpells from './warlock-spells.json'
 import paladinSpells from './paladin-spells.json'
 import rangerSpells from './ranger-spells.json'
+import subclassesData from './subclasses.json'
 
 export const DEFAULT_CLASS = 'sorcerer'
+
+// Annabelle's Lunar Sorcery isn't in the 2014 PHB subclass data, so inject it
+// as a sorcerer option. Picking it lights up the lunar-phase UI on the sheet.
+const LUNAR_SUBCLASS = {
+  name: 'Lunar Sorcery', shortName: 'Lunar',
+  blurb: 'Your magic waxes and wanes with the moon — shifting bonus spells and embodiment effects by phase.',
+  features: [
+    { level: 1, name: 'Lunar Embodiment', description: 'You gain bonus spells and a passive effect tied to the active moon phase (Full, New, or Crescent). Switch phase with the phase selector on your sheet.' },
+    { level: 6, name: 'Lunar Boons', description: 'Casting a spell of the active phase grants a phase-specific boon.' },
+    { level: 6, name: 'Waxing and Waning', description: 'Change your lunar phase as a bonus action by spending 1 sorcery point (free once per long rest).' },
+    { level: 14, name: 'Lunar Empowerment', description: 'Your active-phase effects grow stronger.' },
+    { level: 18, name: 'Lunar Phenomenon', description: 'As a bonus action, shift phase and unleash a powerful phase effect.' },
+  ],
+}
 
 // Half-caster spell slots (Paladin, Ranger) — spellcasting starts at level 2,
 // caps at 5th-level slots. [lvl1..lvl5]
@@ -61,14 +76,12 @@ export const CLASSES = {
     blurb: 'Magic flows through your veins. Lunar Sorcery binds your power to the phases of the moon — shifting bonus spells and embodiment effects as the moon waxes and wanes.',
     proficiencies: 'Daggers, darts, slings, quarterstaffs, light crossbows. No armor or shields.',
     features: [
-      { level: 1, name: 'Spellcasting',         description: 'CHA-based spellcasting.' },
-      { level: 1, name: 'Lunar Embodiment',     description: 'Bonus spells per lunar phase, plus a passive phase effect.' },
-      { level: 1, name: 'Lunar Spells',         description: 'Phase bonus spells always prepared, do not count against spells known.' },
-      { level: 1, name: 'Sorcerous Resilience', description: 'Proficiency in Constitution saving throws.' },
-      { level: 2, name: 'Font of Magic',        description: 'Sorcery Points: convert spell slots to SP or vice versa.' },
-      { level: 3, name: 'Metamagic',            description: 'Bend your spells with Metamagic options.' },
-      { level: 5, name: 'Magical Guidance',     description: 'Spend 1 SP to reroll a failed ability check.' },
-      { level: 6, name: 'Waxing and Waning',    description: 'Change your lunar phase as a bonus action by spending 1 SP (free once per long rest).' },
+      // Base sorcerer features only — origin-specific powers (Lunar Embodiment,
+      // etc.) live on the chosen subclass and render in the Subclass card.
+      { level: 1, name: 'Spellcasting',           description: 'CHA-based spellcasting.' },
+      { level: 2, name: 'Font of Magic',          description: 'Sorcery Points: convert spell slots to SP or vice versa.' },
+      { level: 3, name: 'Metamagic',              description: 'Bend your spells with Metamagic options.' },
+      { level: 20, name: 'Sorcerous Restoration', description: 'Regain 4 sorcery points when you finish a short rest.' },
     ],
     kit: {
       weaponOptions: [
@@ -104,7 +117,6 @@ export const CLASSES = {
     features: [
       { level: 1, name: 'Spellcasting',     description: 'INT-based spellcasting from your spellbook.' },
       { level: 1, name: 'Arcane Recovery',  description: 'Once per day after a short rest, recover spell slots totalling half your wizard level (rounded up), none 6th or higher.' },
-      { level: 2, name: 'Arcane Tradition', description: 'Choose a school specialization at level 2 (track it in your notes for now).' },
       { level: 18, name: 'Spell Mastery',   description: 'Cast one 1st- and one 2nd-level spell at will.' },
     ],
     kit: {
@@ -145,7 +157,6 @@ export const CLASSES = {
       { level: 2, name: 'Jack of All Trades',  description: 'Add half your proficiency bonus to ability checks you are not proficient in.' },
       { level: 2, name: 'Song of Rest',        description: 'Allies who hear your performance during a short rest regain an extra 1d6 HP.' },
       { level: 3, name: 'Expertise',           description: 'Double proficiency bonus for two skill proficiencies (set them to Expert in the Builder).' },
-      { level: 3, name: 'Bard College',        description: 'Choose a college at level 3 (track it in your notes for now).' },
       { level: 5, name: 'Font of Inspiration', description: 'Bardic Inspiration recharges on a short rest.' },
       { level: 6, name: 'Countercharm',        description: 'Performance grants allies advantage on saves vs. being frightened or charmed.' },
       { level: 10, name: 'Magical Secrets',    description: 'Learn two spells from any class.' },
@@ -186,7 +197,6 @@ export const CLASSES = {
     proficiencies: 'Light and medium armor, shields. Simple weapons.',
     features: [
       { level: 1, name: 'Spellcasting',        description: 'WIS-based divine spellcasting — you prepare spells from the full cleric list each day.' },
-      { level: 1, name: 'Divine Domain',       description: 'Choose a domain at level 1 (track it in your notes for now).' },
       { level: 2, name: 'Channel Divinity',    description: 'Turn Undead, plus a domain option. Once per rest (twice at 6th, three times at 18th).' },
       { level: 5, name: 'Destroy Undead',      description: 'Turned undead of CR 1/2 or lower are destroyed (scales with level).' },
       { level: 10, name: 'Divine Intervention', description: 'Once per day, call on your deity — d100 ≤ cleric level and they intervene.' },
@@ -229,7 +239,6 @@ export const CLASSES = {
       { level: 1, name: 'Druidic',       description: 'You know the secret language of druids.' },
       { level: 1, name: 'Spellcasting',  description: 'WIS-based nature magic — you prepare spells from the full druid list each day.' },
       { level: 2, name: 'Wild Shape',    description: 'Transform into a beast you have seen (CR 1/4, no fly/swim — improves with level). Twice per rest.' },
-      { level: 2, name: 'Druid Circle',  description: 'Choose a circle at level 2 (track it in your notes for now).' },
       { level: 18, name: 'Beast Spells', description: 'Cast spells while in Wild Shape.' },
       { level: 20, name: 'Archdruid',    description: 'Unlimited Wild Shape.' },
     ],
@@ -269,7 +278,6 @@ export const CLASSES = {
     blurb: 'You struck a bargain with an otherworldly patron. Few spell slots — but they\'re always at your highest level, and they come back on a short rest.',
     proficiencies: 'Light armor. Simple weapons.',
     features: [
-      { level: 1, name: 'Otherworldly Patron',   description: 'Choose a patron at level 1 (track it in your notes for now).' },
       { level: 1, name: 'Pact Magic',            description: 'CHA-based. All spell slots are the same level and recharge on a short rest.' },
       { level: 2, name: 'Eldritch Invocations',  description: 'Learn 2 invocations (more as you level — track them in your notes for now).' },
       { level: 3, name: 'Pact Boon',             description: 'Choose Pact of the Chain, Blade, or Tome at level 3.' },
@@ -316,7 +324,6 @@ export const CLASSES = {
       { level: 2, name: 'Spellcasting',      description: 'CHA-based divine magic — prepare spells from the paladin list (floor(level/2) + CHA mod).' },
       { level: 2, name: 'Divine Smite',      description: 'On a melee hit, expend a spell slot to deal +2d8 radiant (+1d8 per slot level above 1st, +1d8 vs undead/fiends).' },
       { level: 2, name: 'Fighting Style',    description: 'Choose a fighting style (track it in your notes for now).' },
-      { level: 3, name: 'Sacred Oath',       description: 'Swear your oath at level 3 (track it in your notes for now).' },
       { level: 3, name: 'Divine Health',     description: 'You are immune to disease.' },
       { level: 6, name: 'Aura of Protection', description: 'You and allies within 10 ft add your CHA mod to saving throws.' },
     ],
@@ -359,7 +366,6 @@ export const CLASSES = {
       { level: 1, name: 'Natural Explorer',  description: 'You are a master of a favored terrain — difficult terrain doesn\'t slow your group, you can\'t get lost by magic, and more.' },
       { level: 2, name: 'Spellcasting',      description: 'WIS-based primal magic — you know a fixed set of ranger spells.' },
       { level: 2, name: 'Fighting Style',    description: 'Choose Archery, Defense, Dueling, or Two-Weapon Fighting (track it in your notes for now).' },
-      { level: 3, name: 'Ranger Archetype',  description: 'Choose your archetype at level 3 (track it in your notes for now).' },
       { level: 3, name: 'Primeval Awareness', description: 'Expend a spell slot to sense favored enemies within 1 mile (6 with a favored terrain).' },
       { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action.' },
     ],
@@ -400,7 +406,6 @@ export const CLASSES = {
       { level: 1, name: 'Unarmored Defense',  description: 'While not wearing armor, your AC = 10 + DEX mod + CON mod (you may use a shield). Set this in the Builder.' },
       { level: 2, name: 'Reckless Attack',    description: 'Gain advantage on melee STR attacks this turn; attacks against you have advantage until your next turn.' },
       { level: 2, name: 'Danger Sense',       description: 'Advantage on DEX saves against effects you can see (traps, spells).' },
-      { level: 3, name: 'Primal Path',        description: 'Choose your path at level 3 (track it in your notes for now).' },
       { level: 5, name: 'Extra Attack',       description: 'Attack twice whenever you take the Attack action.' },
       { level: 5, name: 'Fast Movement',      description: '+10 ft speed while not wearing heavy armor.' },
     ],
@@ -437,7 +442,6 @@ export const CLASSES = {
       { level: 1, name: 'Fighting Style',    description: 'Choose a fighting style — Archery, Defense, Dueling, Great Weapon, Protection, or Two-Weapon (track it in your notes for now).' },
       { level: 1, name: 'Second Wind',       description: 'Bonus action: regain 1d10 + fighter level HP. Once per short or long rest.' },
       { level: 2, name: 'Action Surge',      description: 'Take one additional action on your turn. Once per short or long rest (twice at 17th).' },
-      { level: 3, name: 'Martial Archetype', description: 'Choose your archetype at level 3 (track it in your notes for now).' },
       { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action (three times at 11th, four at 20th).' },
     ],
     kit: {
@@ -477,7 +481,6 @@ export const CLASSES = {
       { level: 1, name: 'Martial Arts',      description: 'Use DEX for unarmed/monk-weapon attacks, roll a Martial Arts die (d4→d10) for damage, and make an unarmed strike as a bonus action.' },
       { level: 2, name: 'Ki',                description: 'You have ki points = your level. Spend them on Flurry of Blows, Patient Defense, or Step of the Wind. Recharge on a short rest.' },
       { level: 2, name: 'Unarmored Movement', description: '+10 ft speed while unarmored (scales with level).' },
-      { level: 3, name: 'Monastic Tradition', description: 'Choose your tradition at level 3 (track it in your notes for now).' },
       { level: 3, name: 'Deflect Missiles',  description: 'Reaction: reduce ranged weapon damage by 1d10 + DEX + level; if reduced to 0 you can throw it back.' },
       { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action.' },
       { level: 5, name: 'Stunning Strike',   description: 'Spend 1 ki on a hit to force a CON save or stun the target until your next turn.' },
@@ -517,7 +520,6 @@ export const CLASSES = {
       { level: 1, name: 'Sneak Attack',  description: 'Once per turn, deal extra damage (1d6 at level 1, scaling) to a target you have advantage on, or that\'s near an ally.' },
       { level: 1, name: "Thieves' Cant", description: 'A secret mix of dialect, jargon, and code you can use to hide messages.' },
       { level: 2, name: 'Cunning Action', description: 'Bonus action each turn to Dash, Disengage, or Hide.' },
-      { level: 3, name: 'Roguish Archetype', description: 'Choose your archetype at level 3 (track it in your notes for now).' },
       { level: 5, name: 'Uncanny Dodge', description: 'Reaction: halve the damage from one attack that hits you.' },
     ],
     kit: {
@@ -684,6 +686,41 @@ export function getClassResources(classId, level, abilityScores = {}) {
   }
 
   return out
+}
+
+// ── Subclasses ───────────────────────────────────────────────────────────────
+// { title, gainLevel, options: [{ name, shortName, blurb, features:[{level,name,description}] }] }
+export function getSubclasses(classId) {
+  const data = subclassesData[classId]
+  if (!data) return { title: 'Subclass', gainLevel: 3, options: [] }
+  // Sorcerer also offers the injected Lunar Sorcery option (Annabelle's path)
+  if (classId === 'sorcerer') {
+    return { ...data, options: [LUNAR_SUBCLASS, ...data.options] }
+  }
+  return data
+}
+
+export function getSubclassOption(classId, shortName) {
+  if (!shortName) return null
+  return getSubclasses(classId).options.find(o => o.shortName === shortName) || null
+}
+
+// Full display name for a chosen subclass short name (falls back to the short)
+export function subclassDisplayName(classId, shortName) {
+  if (!shortName) return null
+  return getSubclassOption(classId, shortName)?.name || shortName
+}
+
+// Subclass features unlocked at or below the given character level
+export function getSubclassFeatures(classId, shortName, level) {
+  const opt = getSubclassOption(classId, shortName)
+  if (!opt) return []
+  return opt.features.filter(f => (f.level || 1) <= level)
+}
+
+// Lunar sorcerers get the moon-phase UI + always-prepared bonus spells.
+export function isLunarSorcerer(classId, shortName) {
+  return classId === 'sorcerer' && shortName === 'Lunar'
 }
 
 // AC for a freshly created character of this class

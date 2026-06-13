@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ABILITIES, SPELLS, SKILLS } from '../data/annabelle.js'
 import { getProfBonus, SORCERY_POINTS, maxMetamagic } from '../data/sorcerer-progression.js'
-import { getClass, classMaxHp, classSlotMax, getClassResources } from '../data/classes.js'
+import {
+  getClass, classMaxHp, classSlotMax, getClassResources,
+  isLunarSorcerer, subclassDisplayName, getSubclassFeatures, getSubclasses,
+} from '../data/classes.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
 const LEGACY_KEY = 'annabelle-sheet-v2' // migration: old single-character key
@@ -103,9 +106,10 @@ function loadState(characterId) {
       ...buildDefaults(saved.level || 4, saved.abilityScores || DEFAULT_ABILITIES, saved.characterClass || 'sorcerer'),
       ...saved,
     }
-    // Lunar bonus spells are subclass-granted for SORCERERS only — other classes
-    // (e.g. a cleric with Cure Wounds) must keep these in their known spells.
-    if ((merged.characterClass || 'sorcerer') === 'sorcerer') {
+    // Lunar bonus spells are always prepared by the Lunar Sorcery subclass — only
+    // strip them for an actual Lunar sorcerer (a Draconic sorcerer or a cleric
+    // may legitimately know Cure Wounds etc.).
+    if (isLunarSorcerer(merged.characterClass || 'sorcerer', merged.subclass)) {
       merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
     }
     return merged
@@ -124,7 +128,7 @@ function saveState(characterId, state) {
 export function createCharacterState({
   characterName, background = '', notes = '',
   species = 'Unknown', size = 'Med', speed = 30, speciesTraits = [],
-  characterClass = 'sorcerer',
+  characterClass = 'sorcerer', subclass = null,
   level = 1, abilityScores, ac,
   skillProfs = {}, languages = ['Common'],
   knownCantrips = [], knownSpells = [], chosenMetamagic = [],
@@ -143,7 +147,8 @@ export function createCharacterState({
     speed,
     speciesTraits,
     characterClass,
-    subclass: getClass(characterClass).subclassShort,
+    // chosen subclass short name (e.g. 'Devotion', 'Champion', 'Lunar') or null
+    subclass: subclass ?? getClass(characterClass).subclassShort,
     ac: ac ?? 10 + dexMod,
     xp,
     skillProfs,
@@ -178,7 +183,7 @@ export function useCharacterState(characterId = 'annabelle') {
       if (!cloudData) return
       setState(prev => {
         const merged = { ...prev, ...cloudData }
-        if ((merged.characterClass || 'sorcerer') === 'sorcerer') {
+        if (isLunarSorcerer(merged.characterClass || 'sorcerer', merged.subclass)) {
           merged.knownSpells = (merged.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
         }
         saveState(characterId, merged)
@@ -454,6 +459,17 @@ export function useCharacterState(characterId = 'annabelle') {
   }
 
   // ── Character Info ────────────────────────────────────────
+  function setSubclass(shortName) {
+    setState(prev => {
+      const next = { ...prev, subclass: shortName || null }
+      // Switching a sorcerer onto/off the Lunar path changes which bonus spells
+      // are auto-granted; re-apply the lunar strip so known spells stay correct.
+      if (isLunarSorcerer(next.characterClass, next.subclass)) {
+        next.knownSpells = (next.knownSpells || []).filter(n => !LUNAR_SPELL_NAMES.has(n))
+      }
+      return next
+    })
+  }
   function setAc(n) { update({ ac: Math.max(0, Math.min(30, Number(n) || 0)) }) }
   function setSpeed(n) { update({ speed: Math.max(0, Number(n) || 0) }) }
   function setCharacterName(n) { update({ characterName: n }) }
@@ -488,6 +504,7 @@ export function useCharacterState(characterId = 'annabelle') {
     setSkillProf, addLanguage, removeLanguage,
     // Character info
     setAc, setSpeed, setCharacterName, setBackground, setNotes, setCurrency,
+    setSubclass,
     // Sync
     syncStatus,
     // Derived
@@ -502,5 +519,10 @@ export function useCharacterState(characterId = 'annabelle') {
     spellcastingAbility: cfg.spellAbility,
     classInfo: cfg,
     classResourceDefs: getClassResources(state.characterClass, state.level, state.abilityScores),
+    // Subclass (derived from the stored `subclass` short name)
+    subclassName: subclassDisplayName(state.characterClass, state.subclass),
+    subclassTitle: getSubclasses(state.characterClass).title,
+    subclassFeatures: getSubclassFeatures(state.characterClass, state.subclass, state.level),
+    isLunar: isLunarSorcerer(state.characterClass, state.subclass),
   }
 }

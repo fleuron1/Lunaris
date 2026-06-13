@@ -14,6 +14,7 @@ import {
   CLASSES, CLASS_IDS, getClass, classMaxHp, classSlotMax,
   cantripsKnownFor, spellsLimitFor, maxCastableSpellLevel,
   spellListFor, spellsLimitLabel, startingAc,
+  getSubclasses, getSubclassOption,
 } from '../data/classes.js'
 import { LUNAR_PHASES } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
@@ -33,6 +34,7 @@ const emptyAbilities = (val) => ({ str: val, dex: val, con: val, int: val, wis: 
 const INITIAL_DRAFT = {
   name: '', accent: 'violet', speciesId: null, backgroundId: null, notes: '',
   classId: 'sorcerer',
+  subclassId: null,
   level: 1,
   abilityMethod: 'standard',
   arrayAssign: emptyAbilities(null),
@@ -58,6 +60,7 @@ function classChangePatch(classId) {
   const primary = cls.spellAbility || MARTIAL_PRIMARY[classId] || 'str'
   return {
     classId,
+    subclassId: null,
     classSkills: [],
     extraSkillPicks: [],
     metamagic: [],
@@ -143,6 +146,9 @@ function validateStep(step, draft) {
 
   if (step === 1) {
     const cls = draftClass(draft)
+    const sub = getSubclasses(draft.classId)
+    if (draft.level >= sub.gainLevel && sub.options.length && !draft.subclassId)
+      errors.push(`Choose your ${sub.title} (${cls.name} gets it at level ${sub.gainLevel}).`)
     const extra = species?.extraSkills || 0
     if (draft.classSkills.length !== cls.skillChoices)
       errors.push(`Choose ${cls.skillChoices} ${cls.name.toLowerCase()} skills (${draft.classSkills.length}/${cls.skillChoices} picked).`)
@@ -308,6 +314,7 @@ function buildFinal(draft) {
     speed: species?.speed ?? 30,
     speciesTraits: species?.traits || [],
     characterClass: draft.classId,
+    subclass: draft.subclassId || null,
     level,
     abilityScores: scores,
     ac: startingAc(draft.classId, dexMod, { withKit, speciesAcBonus: species?.acBonus || 0 }),
@@ -464,6 +471,8 @@ function StepClass({ draft, set }) {
   const langChoices = (species?.extraLanguages || 0) + (background?.extraLanguages || 0)
   const fixedLangs = species?.languages || ['Common']
   const mmMax = cls.hasMetamagic && draft.level >= 3 ? maxMetamagic(draft.level) : 0
+  const sub = getSubclasses(draft.classId)
+  const subUnlocked = draft.level >= sub.gainLevel && sub.options.length > 0
 
   // One toggle for both pools: class slots fill first, then species extras.
   // (Matters for bards, whose class list is every skill.)
@@ -575,6 +584,49 @@ function StepClass({ draft, set }) {
           {draft.level >= 4 ? `${cls.casterType === 'none' ? '' : ' ·'} +${asiPointsAvailable(draft.level)} ability points (ASI)` : ''}
         </p>
       </div>
+
+      {/* Subclass — shown once the class reaches its subclass level */}
+      {sub.options.length > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <SectionLabel>{sub.title}</SectionLabel>
+            <span className="text-[11px] text-violet-500/50">
+              {subUnlocked ? `Chosen at level ${sub.gainLevel}` : `Unlocks at level ${sub.gainLevel}`}
+            </span>
+          </div>
+          {!subUnlocked ? (
+            <p className="text-xs text-violet-300/45 italic">
+              Your {sub.title.toLowerCase()} is chosen at level {sub.gainLevel} — raise your starting level to {sub.gainLevel} to pick it now, or add it later in the Builder.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {sub.options.map(opt => (
+                  <PickCard key={opt.shortName} selected={draft.subclassId === opt.shortName} onClick={() => set({ subclassId: opt.shortName })}>
+                    <p className="font-semibold text-white text-sm">{opt.name}</p>
+                    <p className="text-[11px] text-violet-300/50 mt-1 leading-snug">{opt.blurb}</p>
+                  </PickCard>
+                ))}
+              </div>
+              {getSubclassOption(draft.classId, draft.subclassId) && (
+                <div className="mt-4 bg-violet-950/30 border border-violet-900/25 rounded-xl p-4 space-y-2 max-h-72 overflow-y-auto">
+                  {getSubclassOption(draft.classId, draft.subclassId).features
+                    .filter(f => f.level <= draft.level)
+                    .map(f => (
+                      <div key={`${f.level}-${f.name}`}>
+                        <p className="text-xs font-semibold text-violet-200">{f.name} <span className="text-violet-400/40 font-normal">· Lvl {f.level}</span></p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed whitespace-pre-line line-clamp-4">{f.description}</p>
+                      </div>
+                    ))}
+                  {getSubclassOption(draft.classId, draft.subclassId).features.filter(f => f.level <= draft.level).length === 0 && (
+                    <p className="text-[11px] text-violet-300/45 italic">Features from this {sub.title.toLowerCase()} unlock as you level up.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Skills */}
       <div className="card p-5">
@@ -1300,7 +1352,9 @@ function StepReview({ draft }) {
               <span className="text-violet-300">{cfg.species}</span>
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-violet-200">{cls.name}</span>
-              {cls.subclassShort && <span className="text-slate-500 text-xs"> ({cls.subclassShort})</span>}
+              {getSubclassOption(draft.classId, draft.subclassId) && (
+                <span className="text-slate-500 text-xs"> ({getSubclassOption(draft.classId, draft.subclassId).name})</span>
+              )}
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-amber-300/80">Level {cfg.level}</span>
             </p>
@@ -1451,6 +1505,7 @@ export default function CreatePage() {
     }
     const cfg = buildFinal(draft)
     const cls = draftClass(draft)
+    const chosenSub = getSubclassOption(draft.classId, draft.subclassId)
     const id = generateCharacterId(cfg.characterName, characters.map(c => c.id))
     const state = createCharacterState(cfg)
     persistNewCharacter(id, state)
@@ -1458,7 +1513,7 @@ export default function CreatePage() {
       id,
       name: cfg.characterName,
       race: cfg.species,
-      characterClass: cls.subclassShort ? `${cls.name} (${cls.subclassShort})` : cls.name,
+      characterClass: chosenSub ? `${cls.name} (${chosenSub.shortName})` : cls.name,
       accent: draft.accent,
     })
     try { localStorage.removeItem(DRAFT_KEY) } catch {}

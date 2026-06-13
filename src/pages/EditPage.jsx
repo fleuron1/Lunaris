@@ -8,6 +8,7 @@ import {
 import {
   getClass, classSlotMax, cantripsKnownFor, spellsLimitFor,
   maxCastableSpellLevel, spellListFor, spellsLimitLabel,
+  getSubclasses, getSubclassOption,
 } from '../data/classes.js'
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
@@ -48,8 +49,11 @@ const TABS = ['Character', 'Stats', 'Inventory', 'Skills & Languages', 'Spells',
 function CharacterTab({
   level, xp, ac, speed, characterName, background, notes,
   setLevel, setXp, setAc, setSpeed, setCharacterName, setBackground, setNotes,
-  classLabel,
+  classLabel, characterClass, subclass, setSubclass,
 }) {
+  const sub = getSubclasses(characterClass || 'sorcerer')
+  const subUnlocked = level >= sub.gainLevel && sub.options.length > 0
+  const chosenSub = getSubclassOption(characterClass || 'sorcerer', subclass)
   const [xpInput, setXpInput] = useState(String(xp ?? 0))
   const nextXp    = XP_THRESHOLDS[level] ?? null
   const currentXp = XP_THRESHOLDS[level - 1] ?? 0
@@ -135,6 +139,44 @@ function CharacterTab({
           ))}
         </div>
       </Card>
+
+      {/* Subclass */}
+      {sub.options.length > 0 && setSubclass && (
+        <Card className="p-5 sm:col-span-2">
+          <SH>{sub.title}</SH>
+          {!subUnlocked ? (
+            <p className="text-xs text-violet-300/45 italic">Chosen at level {sub.gainLevel}. Raise your level to pick one.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {sub.options.map(opt => (
+                  <button
+                    key={opt.shortName}
+                    onClick={() => setSubclass(subclass === opt.shortName ? null : opt.shortName)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                      subclass === opt.shortName
+                        ? 'bg-violet-800/50 border-violet-500/50 text-white'
+                        : 'bg-[#060c20] border-violet-950/40 text-slate-400 hover:text-slate-200 hover:border-violet-700/50'
+                    }`}
+                  >
+                    {opt.name}
+                  </button>
+                ))}
+              </div>
+              {chosenSub && (
+                <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
+                  {chosenSub.features.filter(f => f.level <= level).map(f => (
+                    <div key={`${f.level}-${f.name}`} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+                      <p className="text-xs font-semibold text-violet-200">{f.name} <span className="text-violet-400/40 font-normal">· Lvl {f.level}</span></p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed whitespace-pre-line">{f.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {/* Notes */}
       <Card className="p-5">
@@ -776,7 +818,7 @@ export default function EditPage({
   skillProfs, setSkillProf,
   characterName, background, notes,
   setCharacterName, setBackground, setNotes,
-  characterClass, subclass, classInfo,
+  characterClass, subclass, setSubclass, classInfo,
 }) {
   const [tab, setTab] = useState('Character')
 
@@ -813,6 +855,7 @@ export default function EditPage({
           setLevel={setLevel} setXp={setXp} setAc={setAc} setSpeed={setSpeed}
           setCharacterName={setCharacterName} setBackground={setBackground} setNotes={setNotes}
           classLabel={classLabel}
+          characterClass={characterClass} subclass={subclass} setSubclass={setSubclass}
         />
       )}
       {tab === 'Stats' && (

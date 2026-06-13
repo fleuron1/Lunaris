@@ -47,6 +47,7 @@ export default function SheetPage({
   species, size, speciesTraits,
   characterClass, subclass, classInfo, hitDiceType, spellcastingAbility,
   classResourceDefs, resources, adjustClassResource, setClassResource,
+  subclassName, subclassTitle, subclassFeatures, isLunar,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
@@ -57,6 +58,8 @@ export default function SheetPage({
   const traits = (speciesTraits && speciesTraits.length) ? speciesTraits : SPECIES_TRAITS
   const cls = classInfo || { name: 'Sorcerer', casterType: 'full', spellAbility: 'cha', hasLunarPhases: true, hasSorceryPoints: true, hasMetamagic: true, features: CLASS_FEATURES.map(f => ({ ...f, level: 1 })) }
   const isCaster = (cls.casterType || 'full') !== 'none'
+  // Lunar UI only for an actual Lunar sorcerer (legacy Annabelle defaults to it)
+  const showLunar = isLunar ?? (cls.hasLunarPhases && (subclass === 'Lunar' || subclass == null))
 
   function handleLongRest() {
     if (showLongRestConfirm) {
@@ -91,7 +94,7 @@ export default function SheetPage({
               <span className="text-violet-300">{speciesName}</span>
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-violet-200">{cls.name}</span>
-              {subclass && <span className="text-slate-500 text-xs"> ({subclass})</span>}
+              {(subclassName || subclass) && <span className="text-slate-500 text-xs"> ({subclassName || subclass})</span>}
               <span className="text-violet-500/50 mx-1.5">·</span>
               <span className="text-amber-300/80">Level {level}</span>
             </p>
@@ -150,7 +153,7 @@ export default function SheetPage({
 
         {/* ── LEFT SIDEBAR ───────────────────────────────── */}
         <aside className="w-full lg:w-[272px] lg:flex-shrink-0 space-y-4 lg:sticky lg:top-16">
-          {cls.hasLunarPhases && <LunarPhaseSwitcher phase={lunarPhase} setPhase={setLunarPhase} />}
+          {showLunar && <LunarPhaseSwitcher phase={lunarPhase} setPhase={setLunarPhase} />}
           <AbilityBlock abilityScores={abilityScores} profBonus={profBonus} />
           <SkillsList abilityScores={abilityScores} profBonus={profBonus} skillProfs={skillProfs} />
         </aside>
@@ -354,6 +357,24 @@ export default function SheetPage({
               </div>
             </div>
           </div>
+
+          {/* Subclass Features — when a subclass is chosen and has unlocked features */}
+          {subclassName && subclassFeatures && subclassFeatures.length > 0 && (
+            <div className="card p-4">
+              <p className="section-header">{subclassTitle || 'Subclass'} — {subclassName}</p>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                {subclassFeatures.map(f => (
+                  <div key={`${f.level}-${f.name}`} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-semibold text-violet-200 text-sm">{f.name}</p>
+                      <span className="text-[10px] text-violet-400/45 uppercase tracking-wider flex-shrink-0">Lvl {f.level}</span>
+                    </div>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed whitespace-pre-line line-clamp-[12]">{f.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Equipment + Languages */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

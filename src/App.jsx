@@ -123,10 +123,10 @@ function QuickDiceMenu({ theme = 'violet' }) {
 
 // ── Sorcerer Nav Bar ──────────────────────────────────────────────────────────
 
-function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncStatus, classInfo }) {
+function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncStatus, classInfo, isLunar }) {
   const base = `/${characterId}`
   // Lunar sorcerers show their moon phase; other classes show their class icon
-  const showMoon = !classInfo || classInfo.hasLunarPhases
+  const showMoon = isLunar ?? (!classInfo || classInfo.hasLunarPhases)
   const isCaster = !classInfo || classInfo.casterType !== 'none'
   const NAV_LINKS = [
     { to: base,          label: 'Sheet',   end: true  },
@@ -295,6 +295,7 @@ function CharacterApp() {
         level={charState.level}
         syncStatus={charState.syncStatus}
         classInfo={charState.classInfo}
+        isLunar={charState.isLunar}
       />
       <main>
         <Routes>
@@ -316,6 +317,7 @@ function CharacterApp() {
                 characterClass={charState.characterClass}
                 spellcastingAbility={charState.spellcastingAbility}
                 classInfo={charState.classInfo}
+                isLunar={charState.isLunar}
               />
             }
           />
@@ -363,6 +365,7 @@ function CharacterApp() {
                 setNotes={charState.setNotes}
                 characterClass={charState.characterClass}
                 subclass={charState.subclass}
+                setSubclass={charState.setSubclass}
                 classInfo={charState.classInfo}
               />
             }
