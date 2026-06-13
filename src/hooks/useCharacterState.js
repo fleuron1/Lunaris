@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ABILITIES, SPELLS, SKILLS } from '../data/annabelle.js'
 import { getProfBonus, SORCERY_POINTS, maxMetamagic } from '../data/sorcerer-progression.js'
-import { getClass, classMaxHp, classSlotMax } from '../data/classes.js'
+import { getClass, classMaxHp, classSlotMax, getClassResources } from '../data/classes.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
 const LEGACY_KEY = 'annabelle-sheet-v2' // migration: old single-character key
@@ -32,6 +32,10 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES, classId = 'sorc
     hitDiceSpent: 0,
     deathSaves: { successes: 0, failures: 0 },
     spellSlots: slots,
+    // Class resources (Rage/Ki/Lay on Hands/…) — keyed by resource id, value =
+    // current amount. Undefined means "full" (computed max), so level-ups and
+    // new characters start topped up without needing to seed every id here.
+    resources: {},
     sorceryPoints: classId === 'sorcerer' ? SORCERY_POINTS[level - 1] : 0,
     heroicInspiration: false,
     lunarPhase: 'full',
@@ -241,6 +245,25 @@ export function useCharacterState(characterId = 'annabelle') {
     }))
   }
 
+  // ── Class Resources (Rage / Ki / Lay on Hands / …) ──────
+  function adjustClassResource(id, delta) {
+    setState(prev => {
+      const def = getClassResources(prev.characterClass, prev.level, prev.abilityScores).find(d => d.id === id)
+      if (!def || def.kind === 'static') return prev
+      const cur = prev.resources?.[id] ?? def.max
+      const next = Math.max(0, Math.min(def.max, cur + delta))
+      return { ...prev, resources: { ...prev.resources, [id]: next } }
+    })
+  }
+  function setClassResource(id, value) {
+    setState(prev => {
+      const def = getClassResources(prev.characterClass, prev.level, prev.abilityScores).find(d => d.id === id)
+      if (!def || def.kind === 'static') return prev
+      const next = Math.max(0, Math.min(def.max, Number(value) || 0))
+      return { ...prev, resources: { ...prev.resources, [id]: next } }
+    })
+  }
+
   // ── Misc ────────────────────────────────────────────────
   function setLunarPhase(phase) { update({ lunarPhase: phase }) }
   function toggleInspiration() { update({ heroicInspiration: !state.heroicInspiration }) }
@@ -281,14 +304,23 @@ export function useCharacterState(characterId = 'annabelle') {
     })
   }
 
-  // Pact magic (warlock) slots recharge on a short rest
+  // Short rest: recharge pact magic (warlock) slots + short-rest class resources
   function shortRest() {
     setState(prev => {
-      if (getClass(prev.characterClass).casterType !== 'pact') return prev
-      const slotMax = classSlotMax(prev.characterClass, prev.level)
-      const slots = {}
-      for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
-      return { ...prev, spellSlots: slots }
+      let next = { ...prev }
+      if (getClass(prev.characterClass).casterType === 'pact') {
+        const slotMax = classSlotMax(prev.characterClass, prev.level)
+        const slots = {}
+        for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
+        next.spellSlots = slots
+      }
+      const defs = getClassResources(prev.characterClass, prev.level, prev.abilityScores)
+      if (defs.some(d => d.recharge === 'short' && d.kind !== 'static')) {
+        const resources = { ...prev.resources }
+        for (const d of defs) if (d.recharge === 'short' && d.kind !== 'static') resources[d.id] = d.max
+        next.resources = resources
+      }
+      return next
     })
   }
 
@@ -298,6 +330,11 @@ export function useCharacterState(characterId = 'annabelle') {
       const slots = {}
       for (let i = 1; i <= 9; i++) slots[i] = { total: slotMax[i], expended: 0 }
       const conMod = Math.floor((prev.abilityScores.con - 10) / 2)
+      // Long rest refills every class resource (short- and long-recharge) to max
+      const resources = {}
+      for (const d of getClassResources(prev.characterClass, prev.level, prev.abilityScores)) {
+        if (d.kind !== 'static') resources[d.id] = d.max
+      }
       return {
         ...prev,
         currentHp: classMaxHp(prev.characterClass, prev.level, conMod),
@@ -306,6 +343,7 @@ export function useCharacterState(characterId = 'annabelle') {
         spellSlots: slots,
         sorceryPoints: prev.characterClass === 'sorcerer' ? SORCERY_POINTS[prev.level - 1] : 0,
         heroicInspiration: false, concentration: null,
+        resources,
       }
     })
   }
@@ -438,6 +476,7 @@ export function useCharacterState(characterId = 'annabelle') {
     toggleSpellSlot, castSpell, adjustSorceryPoints,
     setLunarPhase, toggleInspiration,
     setConcentration, adjustHitDice, rollHitDie,
+    adjustClassResource, setClassResource,
     shortRest, longRest,
     // Advancement
     setLevel, setAbilityScore, toggleKnownSpell, resetSpells, toggleMetamagic, setXp,
@@ -462,5 +501,6 @@ export function useCharacterState(characterId = 'annabelle') {
     hitDiceType: cfg.hitDie,
     spellcastingAbility: cfg.spellAbility,
     classInfo: cfg,
+    classResourceDefs: getClassResources(state.characterClass, state.level, state.abilityScores),
   }
 }

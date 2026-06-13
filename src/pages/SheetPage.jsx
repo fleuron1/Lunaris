@@ -5,6 +5,7 @@ import SkillsList from '../components/SkillsList.jsx'
 import HPTracker from '../components/HPTracker.jsx'
 import SpellSlots from '../components/SpellSlots.jsx'
 import SorceryPoints from '../components/SorceryPoints.jsx'
+import ClassResources from '../components/ClassResources.jsx'
 import HitDice from '../components/HitDice.jsx'
 import DeathSaves from '../components/DeathSaves.jsx'
 import LunarPhaseSwitcher from '../components/LunarPhaseSwitcher.jsx'
@@ -45,6 +46,7 @@ export default function SheetPage({
   currency, setCurrency,
   species, size, speciesTraits,
   characterClass, subclass, classInfo, hitDiceType, spellcastingAbility,
+  classResourceDefs, resources, adjustClassResource, setClassResource,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
@@ -168,24 +170,37 @@ export default function SheetPage({
             {isCaster && <SpellSlots spellSlots={spellSlots} toggleSpellSlot={toggleSpellSlot} />}
           </div>
 
-          {/* Sorcery Points + Hit Dice */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {cls.hasSorceryPoints && (
-              <SorceryPoints
-                sorceryPoints={sorceryPoints}
-                maxSorceryPoints={maxSorceryPoints}
-                adjustSorceryPoints={adjustSorceryPoints}
-              />
-            )}
-            <HitDice
-              level={level}
-              hitDiceSpent={hitDiceSpent}
-              hitDiceType={hitDiceType || 6}
-              conMod={Math.floor((abilityScores.con - 10) / 2)}
-              rollHitDie={rollHitDie}
-              theme="violet"
-            />
-          </div>
+          {/* Sorcery Points / Class Resources + Hit Dice */}
+          {(() => {
+            const hasResources = classResourceDefs && classResourceDefs.length > 0
+            return (
+              <div className={`grid grid-cols-1 ${(cls.hasSorceryPoints || hasResources) ? 'sm:grid-cols-2' : ''} gap-4 items-start`}>
+                {cls.hasSorceryPoints && (
+                  <SorceryPoints
+                    sorceryPoints={sorceryPoints}
+                    maxSorceryPoints={maxSorceryPoints}
+                    adjustSorceryPoints={adjustSorceryPoints}
+                  />
+                )}
+                {hasResources && (
+                  <ClassResources
+                    defs={classResourceDefs}
+                    values={resources}
+                    adjustClassResource={adjustClassResource}
+                    setClassResource={setClassResource}
+                  />
+                )}
+                <HitDice
+                  level={level}
+                  hitDiceSpent={hitDiceSpent}
+                  hitDiceType={hitDiceType || 6}
+                  conMod={Math.floor((abilityScores.con - 10) / 2)}
+                  rollHitDie={rollHitDie}
+                  theme="violet"
+                />
+              </div>
+            )
+          })()}
 
           {/* Death Saves */}
           <DeathSaves

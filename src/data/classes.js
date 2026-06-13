@@ -628,6 +628,64 @@ export function spellsLimitLabel(classId) {
   return getClass(classId).spellsKnownType === 'prepared' ? 'prepared' : 'known'
 }
 
+// ── Class resources (Rage, Ki, Lay on Hands, …) ──────────────────────────────
+// Returns the trackable / reference resources for a class at a given level.
+// kind: 'uses'  → small pip counter (spend/restore)
+//       'pool'  → numeric pool with +/- (e.g. Lay on Hands HP)
+//       'static'→ display-only reference value (e.g. Sneak Attack dice)
+// recharge: 'short' | 'long' (when the resource refills on a rest)
+export function getClassResources(classId, level, abilityScores = {}) {
+  const mod = (a) => Math.floor(((abilityScores[a] ?? 10) - 10) / 2)
+  const out = []
+
+  if (classId === 'barbarian') {
+    const uses = level >= 17 ? 6 : level >= 12 ? 5 : level >= 6 ? 4 : level >= 3 ? 3 : 2
+    const rageDmg = level >= 16 ? 4 : level >= 9 ? 3 : 2
+    out.push({ id: 'rage', name: 'Rage', max: uses, recharge: 'long', kind: 'uses',
+      note: `+${rageDmg} rage damage · resistance to bludgeoning/piercing/slashing${level >= 20 ? ' · (unlimited at 20)' : ''}` })
+  }
+
+  if (classId === 'fighter') {
+    out.push({ id: 'second-wind', name: 'Second Wind', max: 1, recharge: 'short', kind: 'uses',
+      note: `Bonus action: regain 1d10 + ${level} HP` })
+    if (level >= 2) {
+      out.push({ id: 'action-surge', name: 'Action Surge', max: level >= 17 ? 2 : 1, recharge: 'short', kind: 'uses',
+        note: 'One extra action on your turn' })
+    }
+    if (level >= 9) {
+      out.push({ id: 'indomitable', name: 'Indomitable', max: level >= 17 ? 3 : level >= 13 ? 2 : 1, recharge: 'long', kind: 'uses',
+        note: 'Reroll a failed saving throw' })
+    }
+  }
+
+  if (classId === 'monk') {
+    if (level >= 2) {
+      out.push({ id: 'ki', name: 'Ki Points', max: level, recharge: 'short', kind: 'uses',
+        note: 'Flurry of Blows, Patient Defense, Step of the Wind' })
+    }
+    const ma = level >= 17 ? 'd10' : level >= 11 ? 'd8' : level >= 5 ? 'd6' : 'd4'
+    out.push({ id: 'martial-arts', name: 'Martial Arts Die', max: 0, recharge: 'long', kind: 'static', note: ma })
+  }
+
+  if (classId === 'rogue') {
+    const dice = Math.ceil(level / 2)
+    out.push({ id: 'sneak-attack', name: 'Sneak Attack', max: 0, recharge: 'long', kind: 'static', note: `${dice}d6` })
+  }
+
+  if (classId === 'paladin') {
+    out.push({ id: 'lay-on-hands', name: 'Lay on Hands', max: 5 * level, recharge: 'long', kind: 'pool',
+      note: 'Pool of healing HP (or cure disease/poison)' })
+    out.push({ id: 'divine-sense', name: 'Divine Sense', max: 1 + Math.max(0, mod('cha')), recharge: 'long', kind: 'uses',
+      note: 'Detect celestials, fiends, undead' })
+    if (level >= 3) {
+      out.push({ id: 'channel-divinity', name: 'Channel Divinity', max: 1, recharge: 'short', kind: 'uses',
+        note: 'Oath-specific divine power' })
+    }
+  }
+
+  return out
+}
+
 // AC for a freshly created character of this class
 export function startingAc(classId, dexMod, { withKit = true, speciesAcBonus = 0 } = {}) {
   const armor = withKit ? getClass(classId).kit.armor : null
