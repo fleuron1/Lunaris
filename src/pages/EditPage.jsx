@@ -781,7 +781,8 @@ export default function EditPage({
   const [tab, setTab] = useState('Character')
 
   const cls = classInfo || getClass(characterClass || 'sorcerer')
-  const tabs = cls.hasMetamagic ? TABS : TABS.filter(t => t !== 'Metamagic')
+  let tabs = cls.hasMetamagic ? TABS : TABS.filter(t => t !== 'Metamagic')
+  if (cls.casterType === 'none') tabs = tabs.filter(t => t !== 'Spells')
   const classLabel = subclass ? `${subclass} ${cls.name}` : cls.name
   const castMod = mod(abilityScores?.[cls.spellAbility] ?? 10)
 
@@ -829,7 +830,7 @@ export default function EditPage({
           languages={languages} addLanguage={addLanguage} removeLanguage={removeLanguage}
         />
       )}
-      {tab === 'Spells' && (
+      {tab === 'Spells' && cls.casterType !== 'none' && (
         <SpellsTab
           level={level} knownSpells={knownSpells} knownCantrips={knownCantrips}
           toggleKnownSpell={toggleKnownSpell} resetSpells={resetSpells}

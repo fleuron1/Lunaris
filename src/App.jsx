@@ -127,9 +127,10 @@ function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncSt
   const base = `/${characterId}`
   // Lunar sorcerers show their moon phase; other classes show their class icon
   const showMoon = !classInfo || classInfo.hasLunarPhases
+  const isCaster = !classInfo || classInfo.casterType !== 'none'
   const NAV_LINKS = [
     { to: base,          label: 'Sheet',   end: true  },
-    { to: `${base}/spells`, label: 'Spells',  end: false },
+    ...(isCaster ? [{ to: `${base}/spells`, label: 'Spells',  end: false }] : []),
     { to: `${base}/edit`,   label: 'Builder', end: false },
   ]
 
@@ -151,7 +152,7 @@ function CharacterNavBar({ characterId, characterName, lunarPhase, level, syncSt
         <div className="flex items-center gap-2 mr-3">
           <span className="text-xl animate-float">{showMoon ? (PHASE_ICONS[lunarPhase] || '🌕') : (classInfo?.icon || '✦')}</span>
           <div className="hidden sm:block">
-            <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>
               {characterName || 'Character'}
             </p>
             <p className="text-[10px] text-violet-300/55 leading-none mt-0.5">
@@ -222,7 +223,7 @@ function FighterNavBar({ characterId, characterName, level, syncStatus }) {
         <div className="flex items-center gap-2 mr-3">
           <span className="text-xl">❄</span>
           <div className="hidden sm:block">
-            <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <p className="text-sm font-bold text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>
               {characterName || 'Character'}
             </p>
             <p className="text-[10px] text-pink-300/50 leading-none mt-0.5">Echo Knight Fighter</p>

@@ -47,13 +47,19 @@ const INITIAL_DRAFT = {
   goldRolled: null,
 }
 
+// Best default ability to put the +2 origin bonus into (martials have no
+// spell ability, so fall back to a sensible primary stat).
+const MARTIAL_PRIMARY = { monk: 'dex', rogue: 'dex' } // others default to str
+
 // Patch to apply when the class changes — clears every class-dependent pick
 // and re-defaults equipment + origin bonus for the new class.
 function classChangePatch(classId) {
   const cls = getClass(classId)
+  const primary = cls.spellAbility || MARTIAL_PRIMARY[classId] || 'str'
   return {
     classId,
     classSkills: [],
+    extraSkillPicks: [],
     metamagic: [],
     cantrips: [],
     spells: [],
@@ -61,8 +67,8 @@ function classChangePatch(classId) {
     focusChoice: cls.kit.focusOptions[0]?.id,
     packChoice: cls.kit.packOptions[0]?.id,
     goldRolled: null,
-    originPlusTwo: cls.spellAbility,
-    originPlusOne: cls.spellAbility === 'con' ? 'dex' : 'con',
+    originPlusTwo: primary,
+    originPlusOne: primary === 'con' ? 'dex' : 'con',
   }
 }
 
@@ -368,7 +374,7 @@ function StepIdentity({ draft, set }) {
           placeholder="Character name…"
           maxLength={40}
           className="w-full bg-violet-950/50 border border-violet-800/40 rounded-xl px-4 py-3 text-lg text-white placeholder-violet-600/40 focus:outline-none focus:border-violet-500/60"
-          style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+          style={{ fontFamily: 'var(--font-display)' }}
         />
         <div className="flex gap-2 flex-wrap items-center">
           <span className="text-xs text-violet-400/50 mr-1">Card colour:</span>
@@ -508,13 +514,17 @@ function StepClass({ draft, set }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {CLASS_IDS.map(id => {
             const c = CLASSES[id]
+            const casterTag = c.casterType === 'none' ? 'martial'
+              : c.casterType === 'half' ? `½-caster · ${c.spellAbility.toUpperCase()}`
+              : c.casterType === 'pact' ? `pact · ${c.spellAbility.toUpperCase()}`
+              : `${c.spellAbility.toUpperCase()} caster`
             return (
               <PickCard key={id} selected={draft.classId === id} onClick={() => { if (draft.classId !== id) set(classChangePatch(id)) }}>
                 <div className="text-2xl mb-1.5">{c.icon}</div>
                 <p className="font-semibold text-white text-sm">{c.name}</p>
                 <p className="text-[11px] text-violet-300/50 mt-1 leading-snug">{c.blurb}</p>
                 <p className="text-[10px] text-violet-400/50 mt-2">
-                  d{c.hitDie} · {c.spellAbility.toUpperCase()} caster · Saves {c.saves.join('/')}
+                  d{c.hitDie} · {casterTag} · Saves {c.saves.join('/')}
                 </p>
                 {c.subclass && <p className="text-[10px] text-amber-300/70 mt-0.5">{c.subclass}</p>}
               </PickCard>
@@ -544,21 +554,25 @@ function StepClass({ draft, set }) {
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => set({ level: Math.max(1, draft.level - 1) })} disabled={draft.level <= 1}
               className="w-9 h-9 rounded-lg border border-violet-800/40 bg-violet-950/40 text-violet-200 font-bold disabled:opacity-30 hover:bg-violet-900/40 transition-colors">−</button>
-            <span className="text-3xl font-bold text-white w-12 text-center tabular-nums" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>{draft.level}</span>
+            <span className="text-3xl font-bold text-white w-12 text-center tabular-nums" style={{ fontFamily: 'var(--font-display)' }}>{draft.level}</span>
             <button type="button" onClick={() => set({ level: Math.min(20, draft.level + 1) })} disabled={draft.level >= 20}
               className="w-9 h-9 rounded-lg border border-violet-800/40 bg-violet-950/40 text-violet-200 font-bold disabled:opacity-30 hover:bg-violet-900/40 transition-colors">+</button>
           </div>
         </div>
         <p className="text-xs text-violet-300/50 mt-2">
-          Level {draft.level}: {draftCantripMax(draft)} cantrips · {
-            cls.spellsKnownType === 'prepared'
-              ? `level + ${cls.spellAbility.toUpperCase()} mod spells prepared`
-              : `${draftSpellMax(draft)} spells known`
+          {cls.casterType === 'none'
+            ? `Level ${draft.level}: a martial class — no spells. `
+            : <>Level {draft.level}: {draftCantripMax(draft)} cantrips · {
+                cls.spellsKnownType === 'prepared'
+                  ? `${cls.casterType === 'half' ? `floor(level/2) + ${cls.spellAbility.toUpperCase()}` : `level + ${cls.spellAbility.toUpperCase()}`} mod spells prepared`
+                  : `${draftSpellMax(draft)} spells known`
+              }
+              {' '}· max spell level {draftMaxSpellLevel(draft)}
+              {cls.casterType === 'pact' ? ' (pact slots recharge on short rest)' : ''}
+              {cls.casterType === 'half' && draft.level < 2 ? ' (spellcasting starts at level 2)' : ''}
+              {mmMax > 0 ? ` · ${mmMax} metamagic` : ''}</>
           }
-          {' '}· max spell level {draftMaxSpellLevel(draft)}
-          {cls.casterType === 'pact' ? ' (pact slots recharge on short rest)' : ''}
-          {mmMax > 0 ? ` · ${mmMax} metamagic` : ''}
-          {draft.level >= 4 ? ` · +${asiPointsAvailable(draft.level)} ability points (ASI)` : ''}
+          {draft.level >= 4 ? `${cls.casterType === 'none' ? '' : ' ·'} +${asiPointsAvailable(draft.level)} ability points (ASI)` : ''}
         </p>
       </div>
 
@@ -689,8 +703,9 @@ function StepAbilities({ draft, set }) {
   const hp = classMaxHp(draft.classId, draft.level, conMod)
   const ac = startingAc(draft.classId, dexMod, { withKit: draft.equipMode === 'kit', speciesAcBonus: species?.acBonus || 0 })
   const armorName = draft.equipMode === 'kit' && cls.kit.armor ? cls.kit.armor.name : null
+  const isCaster = cls.casterType !== 'none'
   const hints = { ...ABILITY_HINTS, cha: 'Deception, presence' }
-  hints[cls.spellAbility] = 'Your spellcasting ability ★'
+  if (cls.spellAbility) hints[cls.spellAbility] = 'Your spellcasting ability ★'
 
   const pbSpent = pointBuyTotal(draft.pointBuyScores)
   const asiAvail = asiPointsAvailable(draft.level)
@@ -850,7 +865,7 @@ function StepAbilities({ draft, set }) {
             ))}
           </div>
         </div>
-        <p className="text-xs text-violet-300/50 mb-3">Your heritage grants ability bonuses — {ABILITY_NAMES[cls.spellAbility]} fuels your spellcasting.</p>
+        <p className="text-xs text-violet-300/50 mb-3">Your heritage grants ability bonuses{cls.spellAbility ? ` — ${ABILITY_NAMES[cls.spellAbility]} fuels your spellcasting` : ''}.</p>
 
         {draft.originMode === '2-1' ? (
           <div className="space-y-2">
@@ -929,8 +944,10 @@ function StepAbilities({ draft, set }) {
           {[
             { label: 'Hit Points', value: hp, sub: `d${cls.hitDie} hit die` },
             { label: 'Armor Class', value: ac, sub: armorName || (species?.acBonus ? `incl. +${species.acBonus} ${species.name}` : '10 + DEX') },
-            { label: 'Spell Save DC', value: 8 + prof + castMod, sub: cls.spellAbility.toUpperCase() },
-            { label: 'Spell Attack', value: formatMod(prof + castMod) },
+            ...(isCaster ? [
+              { label: 'Spell Save DC', value: 8 + prof + castMod, sub: cls.spellAbility.toUpperCase() },
+              { label: 'Spell Attack', value: formatMod(prof + castMod) },
+            ] : []),
             { label: 'Prof. Bonus', value: `+${prof}` },
             { label: 'Speed', value: `${species?.speed ?? 30} ft` },
           ].map(s => (
@@ -1037,6 +1054,33 @@ function StepSpells({ draft, set }) {
     })
   }
 
+  // Martials don't cast — show a friendly note and nothing to pick.
+  if (cls.casterType === 'none') {
+    return (
+      <div className="card p-8 text-center">
+        <div className="text-4xl mb-3">{cls.icon}</div>
+        <p className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>No spells to choose</p>
+        <p className="text-sm text-violet-300/55 mt-2 max-w-md mx-auto leading-relaxed">
+          The {cls.name} is a martial class — its power comes from weapons, grit, and class
+          features rather than spellcasting. Just continue to your equipment.
+        </p>
+      </div>
+    )
+  }
+  // Half-casters before level 2 can't cast yet.
+  if (sMax === 0) {
+    return (
+      <div className="card p-8 text-center">
+        <div className="text-4xl mb-3">{cls.icon}</div>
+        <p className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>Spellcasting starts at level 2</p>
+        <p className="text-sm text-violet-300/55 mt-2 max-w-md mx-auto leading-relaxed">
+          The {cls.name} gains spell slots at 2nd level. At level {draft.level} you have no spells
+          yet — continue to your equipment.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Lunar freebies callout — sorcerer only */}
@@ -1053,7 +1097,7 @@ function StepSpells({ draft, set }) {
         <div className="rounded-xl border border-violet-800/30 bg-violet-950/30 p-4">
           <p className="text-xs text-violet-200/80 font-semibold mb-1">📖 {cls.name}s prepare spells</p>
           <p className="text-[11px] text-violet-300/55 leading-relaxed">
-            Your limit is level + {cls.spellAbility.toUpperCase()} modifier ({sMax} right now) and you can swap your prepared list after any long rest — pick what you'd start the day with.
+            Your limit is {cls.casterType === 'half' ? 'floor(level/2)' : 'level'} + {cls.spellAbility.toUpperCase()} modifier ({sMax} right now) and you can swap your prepared list after any long rest — pick what you'd start the day with.
           </p>
         </div>
       )}
@@ -1084,25 +1128,27 @@ function StepSpells({ draft, set }) {
         </div>
       </div>
 
-      {/* Cantrips */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <SectionLabel>Cantrips</SectionLabel>
-          <CountChip current={draft.cantrips.length} max={cMax} label="cantrips" />
+      {/* Cantrips — only classes that get them */}
+      {cMax > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <SectionLabel>Cantrips</SectionLabel>
+            <CountChip current={draft.cantrips.length} max={cMax} label="cantrips" />
+          </div>
+          <div className="space-y-1.5">
+            {visibleCantrips.map(sp => (
+              <SpellRow
+                key={sp.name}
+                spell={sp}
+                picked={draft.cantrips.includes(sp.name)}
+                disabled={draft.cantrips.length >= cMax}
+                onToggle={() => toggleCantrip(sp.name)}
+              />
+            ))}
+            {visibleCantrips.length === 0 && <p className="text-xs text-violet-500/50 italic py-3 text-center">No cantrips match your search.</p>}
+          </div>
         </div>
-        <div className="space-y-1.5">
-          {visibleCantrips.map(sp => (
-            <SpellRow
-              key={sp.name}
-              spell={sp}
-              picked={draft.cantrips.includes(sp.name)}
-              disabled={draft.cantrips.length >= cMax}
-              onToggle={() => toggleCantrip(sp.name)}
-            />
-          ))}
-          {visibleCantrips.length === 0 && <p className="text-xs text-violet-500/50 italic py-3 text-center">No cantrips match your search.</p>}
-        </div>
-      </div>
+      )}
 
       {/* Levelled spells */}
       <div className="card p-5">
@@ -1174,7 +1220,7 @@ function StepEquipment({ draft, set }) {
               <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.die} {opt.type}{opt.notes ? ` · ${opt.notes}` : ''}</p>
             </>
           ))}
-          {radioGroup('Spellcasting Focus', kit.focusOptions, 'focusChoice', opt => (
+          {kit.focusOptions.length > 0 && radioGroup('Spellcasting Focus', kit.focusOptions, 'focusChoice', opt => (
             <>
               <p className="font-semibold text-sm text-white">{opt.name}</p>
               <p className="text-[11px] text-violet-300/50 mt-0.5">{opt.description}</p>
@@ -1202,7 +1248,7 @@ function StepEquipment({ draft, set }) {
                 ))}
                 <span className="w-12 h-12 flex items-center justify-center text-violet-400/60 text-lg">×{goldRoll.multiplier}</span>
               </div>
-              <p className="text-3xl font-bold text-amber-300" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>{draft.goldRolled.total} gp</p>
+              <p className="text-3xl font-bold text-amber-300" style={{ fontFamily: 'var(--font-display)' }}>{draft.goldRolled.total} gp</p>
               <button type="button" onClick={rollGold} className="text-xs text-violet-400/60 hover:text-violet-200 underline underline-offset-2">Re-roll</button>
             </>
           ) : (
@@ -1231,8 +1277,9 @@ function StepReview({ draft }) {
   const prof = getProfBonus(cfg.level)
   const hp = classMaxHp(cfg.characterClass, cfg.level, conMod)
   const slots = classSlotMax(cfg.characterClass, cfg.level)
-  const slotStr = Object.entries(slots).filter(([, n]) => n > 0).map(([l, n]) => `L${l}×${n}`).join(' · ')
+  const slotStr = (Object.entries(slots).filter(([, n]) => n > 0).map(([l, n]) => `L${l}×${n}`).join(' · ') || 'none')
     + (cls.casterType === 'pact' ? ' (short-rest recharge)' : '')
+  const isCaster = cls.casterType !== 'none'
 
   return (
     <div className="space-y-6">
@@ -1246,7 +1293,7 @@ function StepReview({ draft }) {
       <div className="card p-5">
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
               {cfg.characterName || 'Unnamed Hero'}
             </h2>
             <p className="text-sm text-slate-300 mt-1">
@@ -1262,8 +1309,11 @@ function StepReview({ draft }) {
           <div className="flex flex-wrap gap-2">
             {[
               { label: 'HP', value: hp }, { label: 'AC', value: cfg.ac },
-              { label: 'Speed', value: cfg.speed }, { label: 'Save DC', value: 8 + prof + castMod },
-              { label: 'Spell Atk', value: formatMod(prof + castMod) },
+              { label: 'Speed', value: cfg.speed },
+              ...(isCaster ? [
+                { label: 'Save DC', value: 8 + prof + castMod },
+                { label: 'Spell Atk', value: formatMod(prof + castMod) },
+              ] : []),
             ].map(s => (
               <div key={s.label} className="bg-violet-950/40 border border-violet-800/30 rounded-xl px-3 py-2 text-center min-w-[64px]">
                 <p className="text-lg font-bold text-white tabular-nums">{s.value}</p>
@@ -1318,15 +1368,19 @@ function StepReview({ draft }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <SectionLabel>Spells</SectionLabel>
-          <p className="text-[11px] text-violet-400/50 mb-2">Slots: {slotStr}</p>
-          <p className="text-xs text-violet-300/60 mb-1 font-semibold">Cantrips</p>
-          <p className="text-xs text-slate-400 mb-3">{cfg.knownCantrips.join(', ') || '—'}</p>
-          <p className="text-xs text-violet-300/60 mb-1 font-semibold">Known Spells</p>
-          <p className="text-xs text-slate-400">{cfg.knownSpells.join(', ') || '—'}</p>
-        </div>
+      <div className={`grid grid-cols-1 ${isCaster ? 'lg:grid-cols-2' : ''} gap-4`}>
+        {isCaster && (
+          <div className="card p-5">
+            <SectionLabel>Spells</SectionLabel>
+            <p className="text-[11px] text-violet-400/50 mb-2">Slots: {slotStr}</p>
+            {draftCantripMax(draft) > 0 && <>
+              <p className="text-xs text-violet-300/60 mb-1 font-semibold">Cantrips</p>
+              <p className="text-xs text-slate-400 mb-3">{cfg.knownCantrips.join(', ') || '—'}</p>
+            </>}
+            <p className="text-xs text-violet-300/60 mb-1 font-semibold">{cls.spellsKnownType === 'prepared' ? 'Prepared' : 'Known'} Spells</p>
+            <p className="text-xs text-slate-400">{cfg.knownSpells.join(', ') || '—'}</p>
+          </div>
+        )}
 
         <div className="card p-5">
           <SectionLabel>Equipment & Gold</SectionLabel>
@@ -1433,7 +1487,7 @@ export default function CreatePage() {
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
           <Link to="/" className="text-xs text-violet-400/60 hover:text-violet-200 transition-colors">← Characters</Link>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mt-1" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mt-1" style={{ fontFamily: 'var(--font-display)' }}>
             ✦ Create a Character
           </h1>
         </div>

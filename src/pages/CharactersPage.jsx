@@ -41,7 +41,7 @@ function CharacterCard({ character, onPlay, onDelete }) {
 
       {/* Avatar circle */}
       <div className={`w-12 h-12 rounded-full bg-violet-900/40 border border-violet-800/40 flex items-center justify-center mb-4 text-xl font-bold ${ACCENT_TEXT[accent] || ACCENT_TEXT.violet}`}
-        style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+        style={{ fontFamily: 'var(--font-display)' }}
       >
         {character.name?.charAt(0) || '?'}
       </div>
@@ -49,7 +49,7 @@ function CharacterCard({ character, onPlay, onDelete }) {
       {/* Name */}
       <h3
         className="text-lg font-bold text-white leading-tight mb-1"
-        style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+        style={{ fontFamily: 'var(--font-display)' }}
       >
         {character.name}
       </h3>
@@ -105,7 +105,7 @@ export default function CharactersPage() {
       <div className="mb-10">
         <h1
           className="text-3xl sm:text-4xl font-bold text-white mb-2"
-          style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+          style={{ fontFamily: 'var(--font-display)' }}
         >
           ✦ Your Characters
         </h1>

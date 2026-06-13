@@ -8,8 +8,20 @@ import bardSpells from './bard-spells.json'
 import clericSpells from './cleric-spells.json'
 import druidSpells from './druid-spells.json'
 import warlockSpells from './warlock-spells.json'
+import paladinSpells from './paladin-spells.json'
+import rangerSpells from './ranger-spells.json'
 
 export const DEFAULT_CLASS = 'sorcerer'
+
+// Half-caster spell slots (Paladin, Ranger) — spellcasting starts at level 2,
+// caps at 5th-level slots. [lvl1..lvl5]
+export const HALF_SLOTS_TABLE = {
+  1:  [0,0,0,0,0], 2:  [2,0,0,0,0], 3:  [3,0,0,0,0], 4:  [3,0,0,0,0],
+  5:  [4,2,0,0,0], 6:  [4,2,0,0,0], 7:  [4,3,0,0,0], 8:  [4,3,0,0,0],
+  9:  [4,3,2,0,0], 10: [4,3,2,0,0], 11: [4,3,3,0,0], 12: [4,3,3,0,0],
+  13: [4,3,3,1,0], 14: [4,3,3,1,0], 15: [4,3,3,2,0], 16: [4,3,3,2,0],
+  17: [4,3,3,3,1], 18: [4,3,3,3,1], 19: [4,3,3,3,2], 20: [4,3,3,3,2],
+}
 
 // Warlock Pact Magic: all slots are the same level and recharge on a short rest
 export const PACT_SLOTS = {
@@ -30,6 +42,9 @@ const SKILLS_ALL = [
   'Insight', 'Intimidation', 'Investigation', 'Medicine', 'Nature', 'Perception',
   'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival',
 ]
+
+// Classes with no cantrips (half-casters + martials) use this 20-level zero row
+const NO_CANTRIPS = Array(20).fill(0)
 
 export const CLASSES = {
   sorcerer: {
@@ -281,6 +296,249 @@ export const CLASSES = {
       goldRoll: { dice: 4, sides: 4, multiplier: 10 },
     },
   },
+
+  // ── Half-casters ────────────────────────────────────────────────────────────
+  paladin: {
+    id: 'paladin', name: 'Paladin', icon: '⚜️', hitDie: 10,
+    spellAbility: 'cha', saves: ['WIS', 'CHA'],
+    skillChoices: 2,
+    skillList: ['Athletics', 'Insight', 'Intimidation', 'Medicine', 'Persuasion', 'Religion'],
+    casterType: 'half',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'prepared', // prepared = floor(level/2) + CHA mod (min 1, none until lvl 2)
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A holy warrior bound by an oath. Smite your enemies, lay hands on the wounded, and project an aura that shields your allies. Spellcasting awakens at level 2.',
+    proficiencies: 'All armor, shields. Simple and martial weapons.',
+    features: [
+      { level: 1, name: 'Divine Sense',     description: 'Action: detect celestials, fiends, and undead nearby, and consecrated/desecrated places. Uses = 1 + CHA mod per long rest.' },
+      { level: 1, name: 'Lay on Hands',      description: 'A pool of healing equal to 5 × your level. Restore HP or cure a disease/poison as an action.' },
+      { level: 2, name: 'Spellcasting',      description: 'CHA-based divine magic — prepare spells from the paladin list (floor(level/2) + CHA mod).' },
+      { level: 2, name: 'Divine Smite',      description: 'On a melee hit, expend a spell slot to deal +2d8 radiant (+1d8 per slot level above 1st, +1d8 vs undead/fiends).' },
+      { level: 2, name: 'Fighting Style',    description: 'Choose a fighting style (track it in your notes for now).' },
+      { level: 3, name: 'Sacred Oath',       description: 'Swear your oath at level 3 (track it in your notes for now).' },
+      { level: 3, name: 'Divine Health',     description: 'You are immune to disease.' },
+      { level: 6, name: 'Aura of Protection', description: 'You and allies within 10 ft add your CHA mod to saving throws.' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'longsword', name: 'Longsword', stat: 'str', die: '1d8', type: 'slashing', notes: 'Versatile (1d10)' },
+        { id: 'warhammer', name: 'Warhammer', stat: 'str', die: '1d8', type: 'bludgeoning', notes: 'Versatile (1d10)' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'priests', name: "Priest's Pack", contents: 'Backpack, Blanket, 10 Candles, Tinderbox, Alms Box, 2 Incense, Censer, Vestments, 2 days Rations, Waterskin' },
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: 'Chain Mail', description: 'AC 16' },
+        { name: 'Shield', description: '+2 AC' },
+        { name: 'Holy Symbol', description: 'Spellcasting focus' },
+        { name: '5 Javelins', description: '1d6 thrown 30/120' },
+      ],
+      armor: { name: 'Chain Mail', baseAc: 16, addDex: false, maxDex: 0, shield: true },
+      goldRoll: { dice: 5, sides: 4, multiplier: 10 },
+    },
+  },
+
+  ranger: {
+    id: 'ranger', name: 'Ranger', icon: '🏹', hitDie: 10,
+    spellAbility: 'wis', saves: ['STR', 'DEX'],
+    skillChoices: 3,
+    skillList: ['Animal Handling', 'Athletics', 'Insight', 'Investigation', 'Nature', 'Perception', 'Stealth', 'Survival'],
+    casterType: 'half',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'known',
+    spellsKnown: [0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A hunter on the wild frontier. Track quarry across any terrain, fight with bow or blade, and call on primal magic. Spellcasting awakens at level 2.',
+    proficiencies: 'Light and medium armor, shields. Simple and martial weapons.',
+    features: [
+      { level: 1, name: "Favored Enemy",     description: 'You have significant experience with a type of enemy — advantage on tracking and recalling lore about them.' },
+      { level: 1, name: 'Natural Explorer',  description: 'You are a master of a favored terrain — difficult terrain doesn\'t slow your group, you can\'t get lost by magic, and more.' },
+      { level: 2, name: 'Spellcasting',      description: 'WIS-based primal magic — you know a fixed set of ranger spells.' },
+      { level: 2, name: 'Fighting Style',    description: 'Choose Archery, Defense, Dueling, or Two-Weapon Fighting (track it in your notes for now).' },
+      { level: 3, name: 'Ranger Archetype',  description: 'Choose your archetype at level 3 (track it in your notes for now).' },
+      { level: 3, name: 'Primeval Awareness', description: 'Expend a spell slot to sense favored enemies within 1 mile (6 with a favored terrain).' },
+      { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action.' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'longbow', name: 'Longbow & 20 arrows', stat: 'dex', die: '1d8', type: 'piercing', notes: 'Ammunition 150/600, Heavy, Two-handed' },
+        { id: 'shortswords', name: 'Two Shortswords', stat: 'finesse', die: '1d6', type: 'piercing', notes: 'Finesse, Light (two-weapon fighting)' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'dungeoneers', name: "Dungeoneer's Pack", contents: 'Backpack, Crowbar, Hammer, 10 Pitons, 10 Torches, Tinderbox, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: 'Scale Mail', description: 'AC 14 + DEX (max 2)' },
+        { name: 'Two Shortswords', description: '1d6 piercing, Finesse' },
+      ],
+      armor: { name: 'Scale Mail', baseAc: 14, addDex: true, maxDex: 2, shield: false },
+      goldRoll: { dice: 5, sides: 4, multiplier: 10 },
+    },
+  },
+
+  // ── Pure martials (non-casters) ───────────────────────────────────────────────
+  barbarian: {
+    id: 'barbarian', name: 'Barbarian', icon: '🪓', hitDie: 12,
+    spellAbility: null, saves: ['STR', 'CON'],
+    skillChoices: 2,
+    skillList: ['Animal Handling', 'Athletics', 'Intimidation', 'Nature', 'Perception', 'Survival'],
+    casterType: 'none',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'none',
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A fury-fueled warrior of the wilds. Rage through pain, hit like a landslide, and shrug off blows that would fell lesser fighters.',
+    proficiencies: 'Light and medium armor, shields. Simple and martial weapons.',
+    features: [
+      { level: 1, name: 'Rage',               description: 'Bonus action: rage for advantage on STR checks/saves, +rage damage on STR attacks, and resistance to bludgeoning/piercing/slashing. Uses scale with level.' },
+      { level: 1, name: 'Unarmored Defense',  description: 'While not wearing armor, your AC = 10 + DEX mod + CON mod (you may use a shield). Set this in the Builder.' },
+      { level: 2, name: 'Reckless Attack',    description: 'Gain advantage on melee STR attacks this turn; attacks against you have advantage until your next turn.' },
+      { level: 2, name: 'Danger Sense',       description: 'Advantage on DEX saves against effects you can see (traps, spells).' },
+      { level: 3, name: 'Primal Path',        description: 'Choose your path at level 3 (track it in your notes for now).' },
+      { level: 5, name: 'Extra Attack',       description: 'Attack twice whenever you take the Attack action.' },
+      { level: 5, name: 'Fast Movement',      description: '+10 ft speed while not wearing heavy armor.' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'greataxe', name: 'Greataxe', stat: 'str', die: '1d12', type: 'slashing', notes: 'Heavy, Two-handed' },
+        { id: 'greatsword', name: 'Greatsword', stat: 'str', die: '2d6', type: 'slashing', notes: 'Heavy, Two-handed' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: '4 Javelins', description: '1d6 thrown 30/120' },
+      ],
+      armor: null,
+      goldRoll: { dice: 2, sides: 4, multiplier: 10 },
+    },
+  },
+
+  fighter: {
+    id: 'fighter', name: 'Fighter', icon: '⚔️', hitDie: 10,
+    spellAbility: null, saves: ['STR', 'CON'],
+    skillChoices: 2,
+    skillList: ['Acrobatics', 'Animal Handling', 'Athletics', 'History', 'Insight', 'Intimidation', 'Perception', 'Survival'],
+    casterType: 'none',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'none',
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A master of weapons and armor. Versatile, durable, and unmatched in sustained combat — the backbone of any front line.',
+    proficiencies: 'All armor, shields. Simple and martial weapons.',
+    features: [
+      { level: 1, name: 'Fighting Style',    description: 'Choose a fighting style — Archery, Defense, Dueling, Great Weapon, Protection, or Two-Weapon (track it in your notes for now).' },
+      { level: 1, name: 'Second Wind',       description: 'Bonus action: regain 1d10 + fighter level HP. Once per short or long rest.' },
+      { level: 2, name: 'Action Surge',      description: 'Take one additional action on your turn. Once per short or long rest (twice at 17th).' },
+      { level: 3, name: 'Martial Archetype', description: 'Choose your archetype at level 3 (track it in your notes for now).' },
+      { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action (three times at 11th, four at 20th).' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'longsword', name: 'Longsword', stat: 'str', die: '1d8', type: 'slashing', notes: 'Versatile (1d10)' },
+        { id: 'greatsword', name: 'Greatsword', stat: 'str', die: '2d6', type: 'slashing', notes: 'Heavy, Two-handed' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'dungeoneers', name: "Dungeoneer's Pack", contents: 'Backpack, Crowbar, Hammer, 10 Pitons, 10 Torches, Tinderbox, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: 'Chain Mail', description: 'AC 16' },
+        { name: 'Shield', description: '+2 AC' },
+        { name: 'Light Crossbow & 20 bolts', description: '1d8 piercing' },
+      ],
+      armor: { name: 'Chain Mail', baseAc: 16, addDex: false, maxDex: 0, shield: true },
+      goldRoll: { dice: 5, sides: 4, multiplier: 10 },
+    },
+  },
+
+  monk: {
+    id: 'monk', name: 'Monk', icon: '👊', hitDie: 8,
+    spellAbility: null, saves: ['STR', 'DEX'],
+    skillChoices: 2,
+    skillList: ['Acrobatics', 'Athletics', 'History', 'Insight', 'Religion', 'Stealth'],
+    casterType: 'none',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'none',
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A disciplined martial artist channeling inner ki. Strike faster than the eye, deflect arrows, and walk paths no armor could follow.',
+    proficiencies: 'Simple weapons and shortswords. No armor or shields.',
+    features: [
+      { level: 1, name: 'Unarmored Defense', description: 'While unarmored and not using a shield, your AC = 10 + DEX mod + WIS mod. Set this in the Builder.' },
+      { level: 1, name: 'Martial Arts',      description: 'Use DEX for unarmed/monk-weapon attacks, roll a Martial Arts die (d4→d10) for damage, and make an unarmed strike as a bonus action.' },
+      { level: 2, name: 'Ki',                description: 'You have ki points = your level. Spend them on Flurry of Blows, Patient Defense, or Step of the Wind. Recharge on a short rest.' },
+      { level: 2, name: 'Unarmored Movement', description: '+10 ft speed while unarmored (scales with level).' },
+      { level: 3, name: 'Monastic Tradition', description: 'Choose your tradition at level 3 (track it in your notes for now).' },
+      { level: 3, name: 'Deflect Missiles',  description: 'Reaction: reduce ranged weapon damage by 1d10 + DEX + level; if reduced to 0 you can throw it back.' },
+      { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action.' },
+      { level: 5, name: 'Stunning Strike',   description: 'Spend 1 ki on a hit to force a CON save or stun the target until your next turn.' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'shortsword', name: 'Shortsword', stat: 'finesse', die: '1d6', type: 'piercing', notes: 'Finesse, Light (monk weapon)' },
+        { id: 'quarterstaff', name: 'Quarterstaff', stat: 'str', die: '1d6', type: 'bludgeoning', notes: 'Versatile (1d8), monk weapon' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'dungeoneers', name: "Dungeoneer's Pack", contents: 'Backpack, Crowbar, Hammer, 10 Pitons, 10 Torches, Tinderbox, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: '10 Darts', description: '1d4 thrown 20/60, Finesse' },
+      ],
+      armor: null,
+      goldRoll: { dice: 5, sides: 4, multiplier: 1 }, // monks start poor (5d4 gp)
+    },
+  },
+
+  rogue: {
+    id: 'rogue', name: 'Rogue', icon: '🗡️', hitDie: 8,
+    spellAbility: null, saves: ['DEX', 'INT'],
+    skillChoices: 4,
+    skillList: ['Acrobatics', 'Athletics', 'Deception', 'Insight', 'Intimidation', 'Investigation', 'Perception', 'Performance', 'Persuasion', 'Sleight of Hand', 'Stealth'],
+    casterType: 'none',
+    cantripsKnown: NO_CANTRIPS,
+    spellsKnownType: 'none',
+    subclass: null, subclassShort: null,
+    hasMetamagic: false, hasSorceryPoints: false, hasLunarPhases: false,
+    blurb: 'A cunning opportunist who turns precision into devastation. Sneak, scout, disarm, and strike where it hurts most.',
+    proficiencies: 'Light armor. Simple weapons, hand crossbows, longswords, rapiers, shortswords. Thieves\' tools.',
+    features: [
+      { level: 1, name: 'Expertise',     description: 'Double your proficiency bonus for two skills (or one skill + thieves\' tools). Set them to Expert in the Builder.' },
+      { level: 1, name: 'Sneak Attack',  description: 'Once per turn, deal extra damage (1d6 at level 1, scaling) to a target you have advantage on, or that\'s near an ally.' },
+      { level: 1, name: "Thieves' Cant", description: 'A secret mix of dialect, jargon, and code you can use to hide messages.' },
+      { level: 2, name: 'Cunning Action', description: 'Bonus action each turn to Dash, Disengage, or Hide.' },
+      { level: 3, name: 'Roguish Archetype', description: 'Choose your archetype at level 3 (track it in your notes for now).' },
+      { level: 5, name: 'Uncanny Dodge', description: 'Reaction: halve the damage from one attack that hits you.' },
+    ],
+    kit: {
+      weaponOptions: [
+        { id: 'rapier', name: 'Rapier', stat: 'finesse', die: '1d8', type: 'piercing', notes: 'Finesse' },
+        { id: 'shortsword', name: 'Shortsword', stat: 'finesse', die: '1d6', type: 'piercing', notes: 'Finesse, Light' },
+      ],
+      focusOptions: [],
+      packOptions: [
+        { id: 'burglars', name: "Burglar's Pack", contents: 'Backpack, Ball Bearings, 10 ft String, Bell, 5 Candles, Crowbar, Hammer, 10 Pitons, Hooded Lantern, 2 Oil, 5 days Rations, Tinderbox, Waterskin, 50 ft Rope' },
+        { id: 'explorers', name: "Explorer's Pack", contents: 'Backpack, Bedroll, Mess Kit, Tinderbox, 10 Torches, 10 days Rations, Waterskin, 50 ft Hempen Rope' },
+      ],
+      fixedItems: [
+        { name: 'Leather Armor', description: 'AC 11 + DEX' },
+        { name: 'Dagger x2', description: '' },
+        { name: "Thieves' Tools", description: '' },
+      ],
+      armor: { name: 'Leather Armor', baseAc: 11, addDex: true, maxDex: null, shield: false },
+      goldRoll: { dice: 4, sides: 4, multiplier: 10 },
+    },
+  },
 }
 
 export const CLASS_IDS = Object.keys(CLASSES)
@@ -292,6 +550,8 @@ export const SPELL_LISTS = {
   cleric: clericSpells,
   druid: druidSpells,
   warlock: warlockSpells,
+  paladin: paladinSpells,
+  ranger: rangerSpells,
 }
 
 // ── Helpers (all tolerate unknown ids by falling back to sorcerer) ────────────
@@ -311,9 +571,14 @@ export function classSlotMax(classId, level) {
   const cfg = getClass(classId)
   const result = {}
   for (let i = 1; i <= 9; i++) result[i] = 0
-  if (cfg.casterType === 'pact') {
+  if (cfg.casterType === 'none') {
+    // martials have no spell slots
+  } else if (cfg.casterType === 'pact') {
     const pact = PACT_SLOTS[level] || PACT_SLOTS[1]
     result[pact.slotLevel] = pact.count
+  } else if (cfg.casterType === 'half') {
+    const slots = HALF_SLOTS_TABLE[level] || HALF_SLOTS_TABLE[1]
+    for (let i = 1; i <= 5; i++) result[i] = slots[i - 1]
   } else {
     const slots = SPELL_SLOTS_TABLE[level] || SPELL_SLOTS_TABLE[1]
     for (let i = 1; i <= 9; i++) result[i] = slots[i - 1]
@@ -321,14 +586,28 @@ export function classSlotMax(classId, level) {
   return result
 }
 
+export function isCaster(classId) {
+  return getClass(classId).casterType !== 'none'
+}
+
 export function cantripsKnownFor(classId, level) {
   return getClass(classId).cantripsKnown[level - 1] || 0
 }
 
-// Max known/prepared spells. Prepared casters need their casting ability mod.
+// Max known/prepared spells.
+//  • martials: 0
+//  • before a class has any slots (e.g. paladin/ranger level 1): 0
+//  • prepared full casters: level + ability mod
+//  • prepared half casters (paladin): floor(level/2) + ability mod
+//  • known casters: their spellsKnown table
 export function spellsLimitFor(classId, level, abilityMod = 0) {
   const cfg = getClass(classId)
-  if (cfg.spellsKnownType === 'prepared') return Math.max(1, level + abilityMod)
+  if (cfg.casterType === 'none') return 0
+  if (maxCastableSpellLevel(classId, level) === 0) return 0
+  if (cfg.spellsKnownType === 'prepared') {
+    const effLevel = cfg.casterType === 'half' ? Math.floor(level / 2) : level
+    return Math.max(1, effLevel + abilityMod)
+  }
   return cfg.spellsKnown[level - 1] || 0
 }
 
@@ -340,6 +619,7 @@ export function maxCastableSpellLevel(classId, level) {
 }
 
 export function spellListFor(classId) {
+  if (getClass(classId).casterType === 'none') return []
   return SPELL_LISTS[classId] || SPELL_LISTS[DEFAULT_CLASS]
 }
 

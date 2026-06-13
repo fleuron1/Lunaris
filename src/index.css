@@ -2,14 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME PALETTE — single source of truth for the app's appearance.
+   Change the look here; everything downstream follows.
+
+   • Colours are space-separated RGB channels (no commas) so Tailwind can apply
+     opacity, e.g. `bg-violet-900/30`. tailwind.config.js maps `violet-*` /
+     `amber-*` to these vars, so editing a value below re-tones the whole app.
+   • --violet-* is the PRIMARY brand colour, --amber-* the ACCENT/highlight.
+   • --surface / --surface-raised are card & panel fills; --bg is the page.
+   • --font-display is the heading font (used via inline style + .font-display).
+
+   The values below reproduce the original violet/amber design exactly — tweak
+   freely. (Swap the violet channels for, say, teal to re-skin in seconds.)
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Primary — violet */
+  --violet-50:  245 243 255;
+  --violet-100: 237 233 254;
+  --violet-200: 221 214 254;
+  --violet-300: 196 181 253;
+  --violet-400: 167 139 250;
+  --violet-500: 139 92 246;
+  --violet-600: 124 58 237;
+  --violet-700: 109 40 217;
+  --violet-800: 91 33 182;
+  --violet-900: 76 29 149;
+  --violet-950: 46 16 101;
+
+  /* Accent — amber */
+  --amber-50:  255 251 235;
+  --amber-100: 254 243 199;
+  --amber-200: 253 230 138;
+  --amber-300: 252 211 77;
+  --amber-400: 251 191 36;
+  --amber-500: 245 158 11;
+  --amber-600: 217 119 6;
+  --amber-700: 180 83 9;
+  --amber-800: 146 64 14;
+  --amber-900: 120 53 15;
+  --amber-950: 69 26 3;
+
+  /* Surfaces & page background (RGB channels) */
+  --bg:             7 9 26;     /* page background base (#07091a)  */
+  --surface:        12 16 48;   /* cards / stat boxes   (#0c1030)  */
+  --surface-raised: 18 22 58;   /* buttons / inputs     (#12163a)  */
+
+  /* Page background glow — two radial gradients layered over --bg */
+  --bg-glow-1: rgba(88, 28, 220, 0.32);
+  --bg-glow-2: rgba(49, 10, 100, 0.22);
+
+  /* Display / heading font */
+  --font-display: 'Cinzel', Georgia, serif;
+}
+
 @layer base {
   body {
     @apply text-slate-100 min-h-screen;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    background-color: #07091a;
+    background-color: rgb(var(--bg));
     background-image:
-      radial-gradient(ellipse at 68% -5%, rgba(88, 28, 220, 0.32) 0%, transparent 52%),
-      radial-gradient(ellipse at 12% 98%, rgba(49, 10, 100, 0.22) 0%, transparent 42%);
+      radial-gradient(ellipse at 68% -5%, var(--bg-glow-1) 0%, transparent 52%),
+      radial-gradient(ellipse at 12% 98%, var(--bg-glow-2) 0%, transparent 42%);
     background-attachment: fixed;
   }
 
@@ -84,12 +138,16 @@
   .pip-filled {
     @apply border-violet-400 bg-violet-500 shadow-[0_0_8px_rgba(167,139,250,0.55)];
   }
+  /* Surface fills below use the themed --surface / --surface-raised vars so the
+     whole panel system recolours from index.css :root. */
   .stat-box {
-    @apply bg-[#0c1030]/90 rounded-xl p-3 text-center border border-violet-900/30
+    background-color: rgb(var(--surface) / 0.9);
+    @apply rounded-xl p-3 text-center border border-violet-900/30
            hover:border-violet-600/30 transition-colors duration-200;
   }
   .card {
-    @apply bg-[#0c1030]/90 rounded-xl border border-violet-900/30
+    background-color: rgb(var(--surface) / 0.9);
+    @apply rounded-xl border border-violet-900/30
            shadow-[0_4px_24px_rgba(88,28,220,0.08)];
   }
   .section-header {
@@ -101,7 +159,8 @@
            shadow-[0_0_12px_rgba(139,92,246,0.2)] hover:shadow-[0_0_16px_rgba(139,92,246,0.35)];
   }
   .btn-secondary {
-    @apply bg-[#12163a] hover:bg-[#1a1f4a] text-slate-200 font-semibold py-1.5 px-4
+    background-color: rgb(var(--surface-raised));
+    @apply hover:brightness-125 text-slate-200 font-semibold py-1.5 px-4
            rounded-lg text-sm transition-all duration-150
            border border-violet-900/35 hover:border-violet-600/35;
   }
@@ -111,15 +170,22 @@
            border border-red-800/40;
   }
   .input-field {
-    @apply bg-[#0c1030] border border-violet-900/40 rounded-lg px-3 py-1.5 text-sm
+    background-color: rgb(var(--surface));
+    @apply border border-violet-900/40 rounded-lg px-3 py-1.5 text-sm
            text-slate-100 focus:outline-none focus:border-violet-500/50
            placeholder-slate-600 transition-colors;
   }
   .btn-sm {
+    background-color: rgb(var(--surface-raised));
     @apply w-7 h-7 flex items-center justify-center rounded-lg
-           bg-[#12163a] hover:bg-violet-800/30 text-slate-300 font-bold text-sm
+           hover:bg-violet-800/30 text-slate-300 font-bold text-sm
            transition-all duration-150 border border-violet-900/30
            hover:border-violet-500/30 select-none;
+  }
+  /* Heading font, themed via --font-display. Use this class OR
+     style={{ fontFamily: 'var(--font-display)' }} on display text. */
+  .font-display {
+    font-family: var(--font-display);
   }
 }
 

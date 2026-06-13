@@ -629,7 +629,7 @@ export default function TontiSheetPage({
           <div className="flex-1 min-w-0">
             <h1
               className="text-3xl sm:text-4xl font-bold text-white leading-none"
-              style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+              style={{ fontFamily: 'var(--font-display)' }}
             >
               {characterName || 'Tonti of Darkgate'}
             </h1>

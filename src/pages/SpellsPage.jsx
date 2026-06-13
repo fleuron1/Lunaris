@@ -135,7 +135,7 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase, rollDic
         <div className={`px-5 pt-5 pb-4 border-b ${isLunar && isActivePhase ? 'border-current/20' : 'border-violet-800/30'}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-white" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+              <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
                 {spell.name}
               </h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -449,7 +449,7 @@ export default function SpellsPage({ concentration, setConcentration, lunarPhase
       <div className="card p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
               Spells
             </h2>
             <div className="flex gap-5 mt-1.5 text-sm">

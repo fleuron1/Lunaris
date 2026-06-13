@@ -336,7 +336,7 @@ function DiceRollerOverlay({ label, damage, theme, onClose }) {
 
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className={`text-lg font-bold leading-none ${t.titleText}`} style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+            <p className={`text-lg font-bold leading-none ${t.titleText}`} style={{ fontFamily: 'var(--font-display)' }}>
               {label}
             </p>
             <p className={`text-sm mt-0.5 ${t.subText}`}>{damage}</p>

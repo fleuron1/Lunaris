@@ -53,7 +53,8 @@ export default function SheetPage({
   // fall back to the static Warforged data
   const speciesName = species || 'Warforged'
   const traits = (speciesTraits && speciesTraits.length) ? speciesTraits : SPECIES_TRAITS
-  const cls = classInfo || { name: 'Sorcerer', hasLunarPhases: true, hasSorceryPoints: true, hasMetamagic: true, features: CLASS_FEATURES.map(f => ({ ...f, level: 1 })) }
+  const cls = classInfo || { name: 'Sorcerer', casterType: 'full', spellAbility: 'cha', hasLunarPhases: true, hasSorceryPoints: true, hasMetamagic: true, features: CLASS_FEATURES.map(f => ({ ...f, level: 1 })) }
+  const isCaster = (cls.casterType || 'full') !== 'none'
 
   function handleLongRest() {
     if (showLongRestConfirm) {
@@ -80,7 +81,7 @@ export default function SheetPage({
           <div className="flex-1 min-w-0">
             <h1
               className="text-3xl sm:text-4xl font-bold text-white leading-none"
-              style={{ fontFamily: "'Cinzel', Georgia, serif" }}
+              style={{ fontFamily: 'var(--font-display)' }}
             >
               {characterName || 'Annabelle'}
             </h1>
@@ -122,21 +123,23 @@ export default function SheetPage({
             </button>
           </div>
 
-          {/* Spellcasting */}
-          <div className="flex gap-4 items-center border-l border-violet-800/30 pl-4">
-            <div className="text-center">
-              <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Ability</p>
-              <p className="text-sm font-bold text-violet-300 mt-0.5">{(spellcastingAbility || 'cha').toUpperCase()}</p>
+          {/* Spellcasting — casters only */}
+          {isCaster && (
+            <div className="flex gap-4 items-center border-l border-violet-800/30 pl-4">
+              <div className="text-center">
+                <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Ability</p>
+                <p className="text-sm font-bold text-violet-300 mt-0.5">{(spellcastingAbility || 'cha').toUpperCase()}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Save DC</p>
+                <p className="text-sm font-bold text-amber-300 mt-0.5">{spellSaveDC}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Atk Bonus</p>
+                <p className="text-sm font-bold text-amber-300 mt-0.5">+{spellAttackBonus}</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Save DC</p>
-              <p className="text-sm font-bold text-amber-300 mt-0.5">{spellSaveDC}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-[10px] text-violet-300/50 uppercase tracking-widest">Atk Bonus</p>
-              <p className="text-sm font-bold text-amber-300 mt-0.5">+{spellAttackBonus}</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -153,8 +156,8 @@ export default function SheetPage({
         {/* ── MAIN CONTENT ───────────────────────────────── */}
         <div className="flex-1 min-w-0 space-y-4">
 
-          {/* HP + Spell Slots */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* HP + Spell Slots (slots for casters only) */}
+          <div className={`grid grid-cols-1 ${isCaster ? 'sm:grid-cols-2' : ''} gap-4`}>
             <HPTracker
               currentHp={currentHp}
               maxHp={maxHp}
@@ -162,7 +165,7 @@ export default function SheetPage({
               adjustHp={adjustHp}
               setTempHp={setTempHp}
             />
-            <SpellSlots spellSlots={spellSlots} toggleSpellSlot={toggleSpellSlot} />
+            {isCaster && <SpellSlots spellSlots={spellSlots} toggleSpellSlot={toggleSpellSlot} />}
           </div>
 
           {/* Sorcery Points + Hit Dice */}
@@ -374,21 +377,25 @@ export default function SheetPage({
                   ))}
                 </div>
               </div>
-              <SectionDivider label="Spellcasting" />
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Ability</p>
-                  <p className="text-sm font-bold text-violet-300 mt-0.5">CHA</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Save DC</p>
-                  <p className="text-sm font-bold text-amber-300 mt-0.5">{spellSaveDC}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Atk Bonus</p>
-                  <p className="text-sm font-bold text-amber-300 mt-0.5">+{spellAttackBonus}</p>
-                </div>
-              </div>
+              {isCaster && (
+                <>
+                  <SectionDivider label="Spellcasting" />
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Ability</p>
+                      <p className="text-sm font-bold text-violet-300 mt-0.5">{(spellcastingAbility || 'cha').toUpperCase()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Save DC</p>
+                      <p className="text-sm font-bold text-amber-300 mt-0.5">{spellSaveDC}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-violet-300/50 uppercase tracking-wider">Atk Bonus</p>
+                      <p className="text-sm font-bold text-amber-300 mt-0.5">+{spellAttackBonus}</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
