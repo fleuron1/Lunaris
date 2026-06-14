@@ -1,3 +1,5 @@
+import DiceText from './DiceText.jsx'
+
 // Generic per-class resource tracker (Rage, Ki, Lay on Hands, Action Surge, …).
 // Driven entirely by classResourceDefs from useCharacterState — no class-specific
 // code here, so new resources added in classes.js show up automatically.
@@ -63,7 +65,7 @@ export default function ClassResources({ defs = [], values = {}, adjustClassReso
               {d.kind === 'uses'
                 ? <Pips current={current} max={d.max} onSet={v => setClassResource(d.id, v)} />
                 : <Pool current={current} max={d.max} onAdjust={delta => adjustClassResource(d.id, delta)} />}
-              {d.note && <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">{d.note}</p>}
+              {d.note && <p className="text-[11px] text-slate-500 mt-1.5 leading-snug"><DiceText text={d.note} label={d.name} /></p>}
             </div>
           )
         })}

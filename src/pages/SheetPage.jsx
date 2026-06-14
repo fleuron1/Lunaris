@@ -13,6 +13,7 @@ import { CLASS_FEATURES, SPECIES_TRAITS } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
 import FEATS from '../data/feats.json'
 import CurrencyTracker from '../components/CurrencyTracker.jsx'
+import DiceText from '../components/DiceText.jsx'
 
 function StatBadge({ label, value, sub }) {
   return (
@@ -241,7 +242,7 @@ export default function SheetPage({
                   <p className="section-header">Fighting Style</p>
                   <div className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
                     <p className="font-semibold text-amber-300/80 text-sm">{fightingStyleDef.name}</p>
-                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{fightingStyleDef.description}</p>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed"><DiceText text={fightingStyleDef.description} label={fightingStyleDef.name} /></p>
                   </div>
                 </div>
               )}
@@ -256,7 +257,7 @@ export default function SheetPage({
                           <p className="font-semibold text-violet-200 text-sm">
                             {feat}{def?.ability ? <span className="text-amber-300/70 text-[11px] font-normal"> · {def.ability}</span> : null}
                           </p>
-                          {def?.description && <p className="text-slate-400 text-xs mt-1 leading-relaxed line-clamp-3">{def.description}</p>}
+                          {def?.description && <p className="text-slate-400 text-xs mt-1 leading-relaxed line-clamp-3"><DiceText text={def.description} label={feat} /></p>}
                         </div>
                       )
                     })}
@@ -331,7 +332,7 @@ export default function SheetPage({
                         <span className="group-hover:underline underline-offset-2">{w.damage}</span>
                         <span className="ml-1.5 text-violet-500/40 group-hover:text-violet-400/70 text-[11px] transition-colors">🎲</span>
                       </td>
-                      <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell">{w.notes}</td>
+                      <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell"><DiceText text={w.notes} label={w.name} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -356,7 +357,7 @@ export default function SheetPage({
                     return (
                       <div key={f.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
                         <p className="font-semibold text-violet-300 text-sm">{f.name}</p>
-                        <p className="text-slate-400 text-xs mt-1 leading-relaxed">{description}</p>
+                        <p className="text-slate-400 text-xs mt-1 leading-relaxed"><DiceText text={description} label={f.name} /></p>
                       </div>
                     )
                   })}
@@ -369,7 +370,7 @@ export default function SheetPage({
                 {traits.map(t => (
                   <div key={t.name} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
                     <p className="font-semibold text-amber-300/80 text-sm">{t.name}</p>
-                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{t.description}</p>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed"><DiceText text={t.description} label={t.name} /></p>
                   </div>
                 ))}
               </div>
@@ -387,7 +388,7 @@ export default function SheetPage({
                       <p className="font-semibold text-violet-200 text-sm">{f.name}</p>
                       <span className="text-[10px] text-violet-400/45 uppercase tracking-wider flex-shrink-0">Lvl {f.level}</span>
                     </div>
-                    <p className="text-slate-400 text-xs mt-1 leading-relaxed whitespace-pre-line line-clamp-[12]">{f.description}</p>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed whitespace-pre-line line-clamp-[12]"><DiceText text={f.description} label={f.name} /></p>
                   </div>
                 ))}
               </div>
@@ -408,7 +409,7 @@ export default function SheetPage({
                       <span>
                         <span className={item.isMagic ? 'text-amber-300/90' : ''}>{item.name}</span>
                         {item.description && (
-                          <span className="text-slate-500 text-xs block">{item.description}</span>
+                          <span className="text-slate-500 text-xs block"><DiceText text={item.description} label={item.name} /></span>
                         )}
                       </span>
                     </li>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SPELLS as LUNAR_SPELLS, COMBAT, LUNAR_PHASES } from '../data/annabelle.js'
 import { spellListFor } from '../data/classes.js'
+import DiceText from '../components/DiceText.jsx'
 
 const LEVEL_LABELS = { C: 'Cantrip', 1: '1st Level', 2: '2nd Level', 3: '3rd Level', 4: '4th Level', 5: '5th Level', 6: '6th Level', 7: '7th Level', 8: '8th Level', 9: '9th Level' }
 
@@ -193,23 +194,15 @@ function SpellModal({ spell, onClose, spellSlots, castSpell, lunarPhase, rollDic
 
         {/* Description */}
         <div className="px-5 py-4 max-h-52 overflow-y-auto space-y-3">
-          {/* Short notes summary (always shown) */}
+          {/* Short notes summary (always shown) — dice clickable */}
           {spell.notes && (
             <p className="text-xs text-violet-300/50 font-medium uppercase tracking-wider border-b border-violet-900/30 pb-2">
-              {spell.notes.split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
-                /^\d+d\d+/.test(part)
-                  ? <span key={i} className="font-bold text-amber-300 text-sm normal-case tracking-normal">{part}</span>
-                  : part
-              )}
+              <DiceText text={spell.notes} label={spell.name} />
             </p>
           )}
-          {/* Full description */}
+          {/* Full description — dice clickable */}
           <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {(spell.description || spell.notes || '').split(/(\d+d\d+(?:[+-]\d+)?)/g).map((part, i) =>
-              /^\d+d\d+/.test(part)
-                ? <span key={i} className="font-bold text-amber-300 text-base">{part}</span>
-                : part
-            )}
+            <DiceText text={spell.description || spell.notes || ''} label={spell.name} />
           </p>
         </div>
 
@@ -371,7 +364,7 @@ function SpellCard({ spell, concentration, setConcentration, lunarPhase, onOpen,
             <span>{spell.range}</span>
           </div>
           {spell.notes && (
-            <p className="text-xs text-slate-400/70 mt-1 leading-snug line-clamp-2">{spell.notes}</p>
+            <p className="text-xs text-slate-400/70 mt-1 leading-snug line-clamp-2"><DiceText text={spell.notes} label={spell.name} /></p>
           )}
         </div>
 

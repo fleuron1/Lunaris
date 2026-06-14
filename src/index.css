@@ -187,6 +187,23 @@
   .font-display {
     font-family: var(--font-display);
   }
+
+  /* Inline clickable dice notation (rendered by <DiceText>). Subtle until hover. */
+  .dice-link {
+    color: rgb(var(--amber-300));
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    border-bottom: 1px dotted rgb(var(--amber-400) / 0.5);
+    padding: 0 1px;
+    border-radius: 3px;
+    transition: background-color 0.12s, color 0.12s;
+  }
+  .dice-link:hover {
+    color: rgb(var(--amber-200));
+    background: rgb(var(--amber-500) / 0.15);
+    border-bottom-color: transparent;
+  }
 }
 
 /* Decorative star prefix on section headers */

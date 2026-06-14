@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ABILITIES, SKILLS, CLASS_FEATURES, SPECIES_TRAITS, SAVE_PROFS, PROFICIENCIES } from '../data/tonti.js'
 import { useDiceRoller } from '../components/DiceRoller.jsx'
+import DiceText from '../components/DiceText.jsx'
 import CurrencyTracker from '../components/CurrencyTracker.jsx'
 import HitDice from '../components/HitDice.jsx'
 
@@ -347,7 +348,7 @@ function ClassFeaturesSection({
                         )
                       })}
                     </div>
-                    <p className="text-slate-400/80 text-xs leading-relaxed">{f.description}</p>
+                    <p className="text-slate-400/80 text-xs leading-relaxed"><DiceText text={f.description} label={f.name} theme="pink" /></p>
                   </div>
                 </div>
               </div>
@@ -403,7 +404,7 @@ function ClassFeaturesSection({
                       </span>
                     )}
                   </div>
-                  <p className="text-slate-400/80 text-xs mt-1 leading-relaxed">{f.description}</p>
+                  <p className="text-slate-400/80 text-xs mt-1 leading-relaxed"><DiceText text={f.description} label={f.name} theme="pink" /></p>
                 </div>
               </div>
             </div>
@@ -458,7 +459,7 @@ function SpeciesTraitsSection({ felineAgilityUsed, toggleFelineAgility }) {
                       <span className="text-[10px] text-pink-400/40">↺ move 0 ft to recharge</span>
                     )}
                   </div>
-                  <p className="text-slate-400/80 text-xs mt-1 leading-relaxed">{t.description}</p>
+                  <p className="text-slate-400/80 text-xs mt-1 leading-relaxed"><DiceText text={t.description} label={t.name} theme="pink" /></p>
                 </div>
               </div>
             </div>
@@ -515,7 +516,7 @@ function WeaponsSection({ weapons }) {
                   <span className="group-hover:underline underline-offset-2">{w.damage}</span>
                   <span className="ml-1.5 text-pink-500/40 group-hover:text-pink-400/70 text-[11px] transition-colors">🎲</span>
                 </td>
-                <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell">{w.notes}</td>
+                <td className="py-2.5 text-slate-500 text-xs hidden sm:table-cell"><DiceText text={w.notes} label={w.name} theme="pink" /></td>
               </tr>
             ))}
           </tbody>
@@ -541,7 +542,7 @@ function EquipmentSection({ equipment, currency, setCurrency }) {
               <span>
                 <span className={item.isMagic ? 'text-pink-300/90' : ''}>{item.name}</span>
                 {item.description && (
-                  <span className="text-slate-500 text-xs block">{item.description}</span>
+                  <span className="text-slate-500 text-xs block"><DiceText text={item.description} label={item.name} theme="pink" /></span>
                 )}
               </span>
             </li>
