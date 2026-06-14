@@ -8,7 +8,7 @@ import {
 import {
   getClass, classSlotMax, cantripsKnownFor, spellsLimitFor,
   maxCastableSpellLevel, spellListFor, spellsLimitLabel,
-  getSubclasses, getSubclassOption,
+  getSubclasses, getSubclassOption, getFightingStyleInfo,
 } from '../data/classes.js'
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
@@ -50,10 +50,13 @@ function CharacterTab({
   level, xp, ac, speed, characterName, background, notes,
   setLevel, setXp, setAc, setSpeed, setCharacterName, setBackground, setNotes,
   classLabel, characterClass, subclass, setSubclass,
+  fightingStyle, setFightingStyle,
 }) {
   const sub = getSubclasses(characterClass || 'sorcerer')
   const subUnlocked = level >= sub.gainLevel && sub.options.length > 0
   const chosenSub = getSubclassOption(characterClass || 'sorcerer', subclass)
+  const fsInfo = getFightingStyleInfo(characterClass)
+  const fsUnlocked = fsInfo && level >= fsInfo.level
   const [xpInput, setXpInput] = useState(String(xp ?? 0))
   const nextXp    = XP_THRESHOLDS[level] ?? null
   const currentXp = XP_THRESHOLDS[level - 1] ?? 0
@@ -174,6 +177,38 @@ function CharacterTab({
                 </div>
               )}
             </>
+          )}
+        </Card>
+      )}
+
+      {/* Fighting Style */}
+      {fsInfo && setFightingStyle && (
+        <Card className="p-5 sm:col-span-2">
+          <SH>Fighting Style</SH>
+          {!fsUnlocked ? (
+            <p className="text-xs text-violet-300/45 italic">Chosen at level {fsInfo.level}. Raise your level to pick one.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {fsInfo.options.map(opt => (
+                <button
+                  key={opt.name}
+                  onClick={() => setFightingStyle(fightingStyle === opt.name ? null : opt.name)}
+                  title={opt.description}
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                    fightingStyle === opt.name
+                      ? 'bg-violet-800/50 border-violet-500/50 text-white'
+                      : 'bg-[#060c20] border-violet-950/40 text-slate-400 hover:text-slate-200 hover:border-violet-700/50'
+                  }`}
+                >
+                  {opt.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {fightingStyle && (
+            <p className="text-[11px] text-slate-400 mt-3 leading-relaxed bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+              {fsInfo.options.find(o => o.name === fightingStyle)?.description}
+            </p>
           )}
         </Card>
       )}
@@ -819,6 +854,7 @@ export default function EditPage({
   characterName, background, notes,
   setCharacterName, setBackground, setNotes,
   characterClass, subclass, setSubclass, classInfo,
+  fightingStyle, setFightingStyle,
 }) {
   const [tab, setTab] = useState('Character')
 
@@ -855,6 +891,8 @@ export default function EditPage({
           setLevel={setLevel} setXp={setXp} setAc={setAc} setSpeed={setSpeed}
           setCharacterName={setCharacterName} setBackground={setBackground} setNotes={setNotes}
           classLabel={classLabel}
+          characterClass={characterClass}
+          fightingStyle={fightingStyle} setFightingStyle={setFightingStyle}
           characterClass={characterClass} subclass={subclass} setSubclass={setSubclass}
         />
       )}

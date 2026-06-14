@@ -11,6 +11,7 @@ import DeathSaves from '../components/DeathSaves.jsx'
 import LunarPhaseSwitcher from '../components/LunarPhaseSwitcher.jsx'
 import { CLASS_FEATURES, SPECIES_TRAITS } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
+import FEATS from '../data/feats.json'
 import CurrencyTracker from '../components/CurrencyTracker.jsx'
 
 function StatBadge({ label, value, sub }) {
@@ -48,6 +49,7 @@ export default function SheetPage({
   characterClass, subclass, classInfo, hitDiceType, spellcastingAbility,
   classResourceDefs, resources, adjustClassResource, setClassResource,
   subclassName, subclassTitle, subclassFeatures, isLunar,
+  fightingStyleDef,
 }) {
   const [showLongRestConfirm, setShowLongRestConfirm] = useState(false)
   const { roll } = useDiceRoller()
@@ -231,20 +233,36 @@ export default function SheetPage({
             )}
           </div>
 
-          {/* Feats — only shown if any chosen */}
-          {feats && feats.length > 0 && (
-            <div className="card p-4">
-              <p className="section-header">Feats</p>
-              <div className="flex flex-wrap gap-2">
-                {feats.map(feat => (
-                  <span
-                    key={feat}
-                    className="bg-violet-950/50 text-violet-300/80 text-xs px-2.5 py-1 rounded-full border border-violet-800/40"
-                  >
-                    {feat}
-                  </span>
-                ))}
-              </div>
+          {/* Fighting Style + Feats */}
+          {(fightingStyleDef || (feats && feats.length > 0)) && (
+            <div className="card p-4 space-y-3">
+              {fightingStyleDef && (
+                <div>
+                  <p className="section-header">Fighting Style</p>
+                  <div className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+                    <p className="font-semibold text-amber-300/80 text-sm">{fightingStyleDef.name}</p>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{fightingStyleDef.description}</p>
+                  </div>
+                </div>
+              )}
+              {feats && feats.length > 0 && (
+                <div>
+                  <p className="section-header">Feats</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {feats.map(feat => {
+                      const def = FEATS.find(f => f.name === feat)
+                      return (
+                        <div key={feat} className="bg-violet-950/30 rounded-lg p-3 border border-violet-900/20">
+                          <p className="font-semibold text-violet-200 text-sm">
+                            {feat}{def?.ability ? <span className="text-amber-300/70 text-[11px] font-normal"> · {def.ability}</span> : null}
+                          </p>
+                          {def?.description && <p className="text-slate-400 text-xs mt-1 leading-relaxed line-clamp-3">{def.description}</p>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

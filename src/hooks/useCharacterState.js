@@ -4,6 +4,7 @@ import { getProfBonus, SORCERY_POINTS, maxMetamagic } from '../data/sorcerer-pro
 import {
   getClass, classMaxHp, classSlotMax, getClassResources,
   isLunarSorcerer, subclassDisplayName, getSubclassFeatures, getSubclasses,
+  getFightingStyleInfo, getFightingStyle,
 } from '../data/classes.js'
 import { loadFromCloud, saveToCloud } from '../lib/supabase.js'
 
@@ -63,6 +64,7 @@ function buildDefaults(level = 4, abilities = DEFAULT_ABILITIES, classId = 'sorc
     size: 'Med',
     characterClass: classId,
     subclass: getClass(classId).subclassShort,
+    fightingStyle: null,
     speciesTraits: null,
     // Skill proficiencies: { 'Deception': 'proficient' | 'expert' }
     skillProfs: { ...DEFAULT_SKILL_PROFS },
@@ -128,9 +130,9 @@ function saveState(characterId, state) {
 export function createCharacterState({
   characterName, background = '', notes = '',
   species = 'Unknown', size = 'Med', speed = 30, speciesTraits = [],
-  characterClass = 'sorcerer', subclass = null,
+  characterClass = 'sorcerer', subclass = null, fightingStyle = null,
   level = 1, abilityScores, ac,
-  skillProfs = {}, languages = ['Common'],
+  skillProfs = {}, languages = ['Common'], feats = [],
   knownCantrips = [], knownSpells = [], chosenMetamagic = [],
   weapons = [], equipment = [], currency = { cp: 0, sp: 0, gp: 0, pp: 0 },
   xp = 0,
@@ -149,6 +151,7 @@ export function createCharacterState({
     characterClass,
     // chosen subclass short name (e.g. 'Devotion', 'Champion', 'Lunar') or null
     subclass: subclass ?? getClass(characterClass).subclassShort,
+    fightingStyle: fightingStyle ?? null,
     ac: ac ?? 10 + dexMod,
     xp,
     skillProfs,
@@ -159,7 +162,7 @@ export function createCharacterState({
     weapons: weapons.map(w => ({ id: w.id || uid(), ...w })),
     equipment: equipment.map(e => ({ id: e.id || uid(), ...e })),
     currency: { ...currency },
-    feats: [],
+    feats: [...feats],
   }
 }
 
@@ -470,6 +473,7 @@ export function useCharacterState(characterId = 'annabelle') {
       return next
     })
   }
+  function setFightingStyle(name) { update({ fightingStyle: name || null }) }
   function setAc(n) { update({ ac: Math.max(0, Math.min(30, Number(n) || 0)) }) }
   function setSpeed(n) { update({ speed: Math.max(0, Number(n) || 0) }) }
   function setCharacterName(n) { update({ characterName: n }) }
@@ -504,7 +508,7 @@ export function useCharacterState(characterId = 'annabelle') {
     setSkillProf, addLanguage, removeLanguage,
     // Character info
     setAc, setSpeed, setCharacterName, setBackground, setNotes, setCurrency,
-    setSubclass,
+    setSubclass, setFightingStyle,
     // Sync
     syncStatus,
     // Derived
@@ -524,5 +528,8 @@ export function useCharacterState(characterId = 'annabelle') {
     subclassTitle: getSubclasses(state.characterClass).title,
     subclassFeatures: getSubclassFeatures(state.characterClass, state.subclass, state.level),
     isLunar: isLunarSorcerer(state.characterClass, state.subclass),
+    // Fighting style (the unlock level gates whether the picker shows)
+    fightingStyleInfo: getFightingStyleInfo(state.characterClass),
+    fightingStyleDef: getFightingStyle(state.characterClass, state.fightingStyle),
   }
 }

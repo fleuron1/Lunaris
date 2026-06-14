@@ -43,17 +43,19 @@ function adaptSpell(s, includeLunar) {
 
 // Per-class spell list. Sorcerers also get the curated lunar bonus spells that
 // aren't on their class list (always-prepared subclass spells).
+// Lunar bonus spells are always-prepared only for a LUNAR sorcerer; a Draconic
+// sorcerer (or any other class) just sees the normal class list.
 const SPELL_LIST_CACHE = {}
-function getAllSpells(classId = 'sorcerer') {
-  if (SPELL_LIST_CACHE[classId]) return SPELL_LIST_CACHE[classId]
+function getAllSpells(classId = 'sorcerer', isLunar = false) {
+  const key = `${classId}${isLunar ? '|lunar' : ''}`
+  if (SPELL_LIST_CACHE[key]) return SPELL_LIST_CACHE[key]
   const baseList = spellListFor(classId)
-  const isSorcerer = classId === 'sorcerer'
-  let list = baseList.map(s => adaptSpell(s, isSorcerer))
-  if (isSorcerer) {
+  let list = baseList.map(s => adaptSpell(s, isLunar))
+  if (isLunar) {
     const names = new Set(baseList.map(s => s.name))
     list = [...list, ...LUNAR_SPELLS.filter(s => !names.has(s.name))]
   }
-  SPELL_LIST_CACHE[classId] = list
+  SPELL_LIST_CACHE[key] = list
   return list
 }
 
@@ -409,12 +411,12 @@ function SpellCard({ spell, concentration, setConcentration, lunarPhase, onOpen,
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell, rollDice, characterClass, spellcastingAbility, classInfo }) {
+export default function SpellsPage({ concentration, setConcentration, lunarPhase, spellSaveDC, spellAttackBonus, knownSpells, knownCantrips, spellSlots, castSpell, rollDice, characterClass, spellcastingAbility, classInfo, isLunar }) {
   const [selectedSpell, setSelectedSpell] = useState(null)
-  const isLunarSorcerer = classInfo ? !!classInfo.hasLunarPhases : true
+  const isLunarSorcerer = isLunar ?? (classInfo ? !!classInfo.hasLunarPhases : true)
 
   const grouped = {}
-  getAllSpells(characterClass || 'sorcerer').forEach(spell => {
+  getAllSpells(characterClass || 'sorcerer', isLunarSorcerer).forEach(spell => {
     const isCantrip = spell.level === 'C'
     // Lunar bonus spells are always shown; other spells only if known
     const show = spell.lunar

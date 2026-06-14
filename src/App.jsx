@@ -367,6 +367,8 @@ function CharacterApp() {
                 subclass={charState.subclass}
                 setSubclass={charState.setSubclass}
                 classInfo={charState.classInfo}
+                fightingStyle={charState.fightingStyle}
+                setFightingStyle={charState.setFightingStyle}
               />
             }
           />

@@ -15,7 +15,9 @@ import {
   cantripsKnownFor, spellsLimitFor, maxCastableSpellLevel,
   spellListFor, spellsLimitLabel, startingAc,
   getSubclasses, getSubclassOption,
+  getFightingStyleInfo, getFightingStyle,
 } from '../data/classes.js'
+import FEATS from '../data/feats.json'
 import { LUNAR_PHASES } from '../data/annabelle.js'
 import metamagicData from '../data/metamagic.json'
 import { createCharacterState, persistNewCharacter } from '../hooks/useCharacterState.js'
@@ -35,6 +37,7 @@ const INITIAL_DRAFT = {
   name: '', accent: 'violet', speciesId: null, backgroundId: null, notes: '',
   classId: 'sorcerer',
   subclassId: null,
+  fightingStyle: null,
   level: 1,
   abilityMethod: 'standard',
   arrayAssign: emptyAbilities(null),
@@ -42,6 +45,7 @@ const INITIAL_DRAFT = {
   manualScores: emptyAbilities(10),
   originMode: '2-1', originPlusTwo: 'cha', originPlusOne: 'con', originOnes: [],
   asiAlloc: emptyAbilities(0),
+  feats: [],
   classSkills: [], extraSkillPicks: [], extraLangPicks: [],
   metamagic: [],
   cantrips: [], spells: [],
@@ -61,6 +65,9 @@ function classChangePatch(classId) {
   return {
     classId,
     subclassId: null,
+    fightingStyle: null,
+    feats: [],
+    asiAlloc: emptyAbilities(0),
     classSkills: [],
     extraSkillPicks: [],
     metamagic: [],
@@ -114,8 +121,11 @@ function getFinalScores(draft) {
 function getSpecies(draft)    { return SPECIES.find(s => s.id === draft.speciesId) || null }
 function getBackground(draft) { return BACKGROUNDS.find(b => b.id === draft.backgroundId) || null }
 
+function asiSlots(level) {
+  return ASI_LEVELS.filter(l => l <= level).length
+}
 function asiPointsAvailable(level) {
-  return 2 * ASI_LEVELS.filter(l => l <= level).length
+  return 2 * asiSlots(level)
 }
 
 // Class-dependent derivations from the draft
@@ -149,6 +159,9 @@ function validateStep(step, draft) {
     const sub = getSubclasses(draft.classId)
     if (draft.level >= sub.gainLevel && sub.options.length && !draft.subclassId)
       errors.push(`Choose your ${sub.title} (${cls.name} gets it at level ${sub.gainLevel}).`)
+    const fs = getFightingStyleInfo(draft.classId)
+    if (fs && draft.level >= fs.level && !draft.fightingStyle)
+      errors.push(`Choose a Fighting Style (${cls.name} gets one at level ${fs.level}).`)
     const extra = species?.extraSkills || 0
     if (draft.classSkills.length !== cls.skillChoices)
       errors.push(`Choose ${cls.skillChoices} ${cls.name.toLowerCase()} skills (${draft.classSkills.length}/${cls.skillChoices} picked).`)
@@ -181,9 +194,11 @@ function validateStep(step, draft) {
       errors.push(`Pick three abilities for +1 origin bonuses (${draft.originOnes.length}/3).`)
     }
     if (draft.level >= 4) {
-      const avail = asiPointsAvailable(draft.level)
+      const slots = asiSlots(draft.level)
+      if (draft.feats.length > slots) errors.push(`Too many feats — you have ${slots} ASI/feat slot${slots > 1 ? 's' : ''}.`)
+      const avail = 2 * Math.max(0, slots - draft.feats.length)
       const spent = ABILITY_KEYS.reduce((s, k) => s + (draft.asiAlloc[k] || 0), 0)
-      if (spent > avail) errors.push(`Too many ability score improvement points spent (${spent}/${avail}).`)
+      if (spent > avail) errors.push(`Too many ability points spent (${spent}/${avail}) — each feat uses one ASI slot.`)
     }
   }
 
@@ -315,9 +330,13 @@ function buildFinal(draft) {
     speciesTraits: species?.traits || [],
     characterClass: draft.classId,
     subclass: draft.subclassId || null,
+    fightingStyle: draft.fightingStyle || null,
+    feats: [...draft.feats],
     level,
     abilityScores: scores,
-    ac: startingAc(draft.classId, dexMod, { withKit, speciesAcBonus: species?.acBonus || 0 }),
+    // Defense fighting style grants +1 AC while in armor — bake it in at creation
+    ac: startingAc(draft.classId, dexMod, { withKit, speciesAcBonus: species?.acBonus || 0 })
+      + (draft.fightingStyle === 'Defense' && withKit && draftClass(draft).kit.armor ? 1 : 0),
     skillProfs,
     languages,
     knownCantrips: [...draft.cantrips],
@@ -473,6 +492,8 @@ function StepClass({ draft, set }) {
   const mmMax = cls.hasMetamagic && draft.level >= 3 ? maxMetamagic(draft.level) : 0
   const sub = getSubclasses(draft.classId)
   const subUnlocked = draft.level >= sub.gainLevel && sub.options.length > 0
+  const fsInfo = getFightingStyleInfo(draft.classId)
+  const fsUnlocked = fsInfo && draft.level >= fsInfo.level
 
   // One toggle for both pools: class slots fill first, then species extras.
   // (Matters for bards, whose class list is every skill.)
@@ -628,6 +649,28 @@ function StepClass({ draft, set }) {
         </div>
       )}
 
+      {/* Fighting Style — fighter L1, paladin/ranger L2 */}
+      {fsInfo && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+            <SectionLabel>Fighting Style</SectionLabel>
+            <span className="text-[11px] text-violet-500/50">{fsUnlocked ? `Chosen at level ${fsInfo.level}` : `Unlocks at level ${fsInfo.level}`}</span>
+          </div>
+          {!fsUnlocked ? (
+            <p className="text-xs text-violet-300/45 italic">Your fighting style is chosen at level {fsInfo.level} — raise your level to pick it, or add it later in the Builder.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {fsInfo.options.map(opt => (
+                <PickCard key={opt.name} selected={draft.fightingStyle === opt.name} onClick={() => set({ fightingStyle: opt.name })}>
+                  <p className="font-semibold text-white text-sm">{opt.name}</p>
+                  <p className="text-[11px] text-violet-300/50 mt-1 leading-snug">{opt.description}</p>
+                </PickCard>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Skills */}
       <div className="card p-5">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
@@ -740,6 +783,66 @@ function StepClass({ draft, set }) {
   )
 }
 
+// Searchable feat picker (used inside the ASI/feat allocator)
+function FeatPicker({ draft, slots, onToggle }) {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(null)
+  const full = draft.feats.length >= slots
+  const q = search.trim().toLowerCase()
+  const list = FEATS.filter(f => !q || f.name.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q))
+
+  return (
+    <div className="mt-4 pt-4 border-t border-violet-900/30">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-violet-400/50">Feats</p>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search feats…"
+          className="bg-violet-950/50 border border-violet-800/40 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-violet-600/40 focus:outline-none focus:border-violet-500/60"
+        />
+      </div>
+      <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+        {list.map(f => {
+          const picked = draft.feats.includes(f.name)
+          const disabled = !picked && full
+          return (
+            <div key={f.name} className={`rounded-lg border ${picked ? 'bg-violet-900/30 border-violet-500/50' : 'bg-violet-950/25 border-violet-900/25'}`}>
+              <div className="flex items-center gap-2 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onToggle(f.name)}
+                  disabled={disabled}
+                  className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center text-[11px] font-bold transition-all ${
+                    picked ? 'bg-violet-600 border-violet-400 text-white'
+                    : disabled ? 'border-violet-900/40 text-transparent cursor-not-allowed'
+                    : 'border-violet-700/50 text-transparent hover:border-violet-500/70'
+                  }`}
+                  title={disabled ? 'No ASI/feat slots left' : picked ? 'Remove feat' : 'Take this feat'}
+                >✓</button>
+                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setOpen(o => o === f.name ? null : f.name)}>
+                  <p className="text-sm font-semibold text-white truncate">
+                    {f.name}
+                    {f.ability && <span className="ml-1.5 text-[10px] text-amber-300/80">{f.ability}</span>}
+                    {f.prerequisite && <span className="ml-1.5 text-[9px] bg-violet-950/60 border border-violet-800/40 text-violet-300/60 px-1.5 py-0.5 rounded">{f.prerequisite}</span>}
+                  </p>
+                </button>
+                <button type="button" onClick={() => setOpen(o => o === f.name ? null : f.name)} className="text-violet-500/50 hover:text-violet-300 text-xs flex-shrink-0">
+                  {open === f.name ? '▲' : '▼'}
+                </button>
+              </div>
+              {open === f.name && (
+                <p className="px-3 pb-2.5 -mt-0.5 text-xs text-slate-400 leading-relaxed whitespace-pre-line">{f.description}</p>
+              )}
+            </div>
+          )
+        })}
+        {list.length === 0 && <p className="text-xs text-violet-500/50 italic py-3 text-center">No feats match your search.</p>}
+      </div>
+    </div>
+  )
+}
+
 // ── Step 2: Abilities ─────────────────────────────────────────────────────────
 
 function StepAbilities({ draft, set }) {
@@ -760,7 +863,8 @@ function StepAbilities({ draft, set }) {
   if (cls.spellAbility) hints[cls.spellAbility] = 'Your spellcasting ability ★'
 
   const pbSpent = pointBuyTotal(draft.pointBuyScores)
-  const asiAvail = asiPointsAvailable(draft.level)
+  const slots = asiSlots(draft.level)                       // ASI/feat slots earned
+  const asiAvail = 2 * Math.max(0, slots - draft.feats.length) // points left after feats
   const asiSpent = ABILITY_KEYS.reduce((s, k) => s + (draft.asiAlloc[k] || 0), 0)
 
   function setArrayValue(key, value) {
@@ -806,6 +910,22 @@ function StepAbilities({ draft, set }) {
     } else if (cur > 0) {
       set({ asiAlloc: { ...draft.asiAlloc, [key]: cur - 1 } })
     }
+  }
+
+  // Each feat consumes one ASI slot (2 ability points). Adding a feat trims any
+  // now-over-budget ability allocation from the largest entries first.
+  function toggleDraftFeat(name) {
+    if (draft.feats.includes(name)) { set({ feats: draft.feats.filter(n => n !== name) }); return }
+    if (draft.feats.length >= slots) return
+    const newAvail = 2 * Math.max(0, slots - (draft.feats.length + 1))
+    const alloc = { ...draft.asiAlloc }
+    let spent = ABILITY_KEYS.reduce((s, k) => s + (alloc[k] || 0), 0)
+    while (spent > newAvail) {
+      const k = ABILITY_KEYS.filter(x => (alloc[x] || 0) > 0).sort((a, b) => (alloc[b] || 0) - (alloc[a] || 0))[0]
+      if (!k) break
+      alloc[k] -= 1; spent -= 1
+    }
+    set({ feats: [...draft.feats, name], asiAlloc: alloc })
   }
 
   const METHODS = [
@@ -965,16 +1085,19 @@ function StepAbilities({ draft, set }) {
         )}
       </div>
 
-      {/* ASI allocator */}
+      {/* ASI / feat allocator */}
       {draft.level >= 4 && (
         <div className="card p-5">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-            <SectionLabel>Ability Score Improvements</SectionLabel>
-            <CountChip current={asiSpent} max={asiAvail} label="points" />
+            <SectionLabel>Ability Improvements & Feats</SectionLabel>
+            <div className="flex gap-2">
+              <CountChip current={draft.feats.length} max={slots} label="feat slots" />
+              <CountChip current={asiSpent} max={asiAvail} label="ability pts" />
+            </div>
           </div>
           <p className="text-xs text-violet-300/50 mb-3">
-            Sorcerers gain ASIs at levels {ASI_LEVELS.filter(l => l <= draft.level).join(', ')} — {asiAvail} points to spend (+1 each, max 20 per score).
-            Unspent points are fine: you can take feats instead in the Builder afterwards.
+            You reach ASI levels {ASI_LEVELS.filter(l => l <= draft.level).join(', ')} — that's {slots} slot{slots > 1 ? 's' : ''}.
+            Spend each slot on <span className="text-emerald-300/80">+2 ability points</span> or <span className="text-amber-300/80">one feat</span> (each feat below uses a slot).
           </p>
           <div className="flex flex-wrap gap-2">
             {ABILITY_KEYS.map(k => (
@@ -986,6 +1109,8 @@ function StepAbilities({ draft, set }) {
               </div>
             ))}
           </div>
+
+          <FeatPicker draft={draft} slots={slots} onToggle={toggleDraftFeat} />
         </div>
       )}
 
@@ -1415,6 +1540,22 @@ function StepReview({ draft }) {
               <div className="flex flex-wrap gap-1.5">
                 {cfg.chosenMetamagic.map(m => (
                   <span key={m} className="text-xs bg-amber-900/25 border border-amber-700/30 text-amber-200/80 px-2.5 py-1 rounded-full">{m}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {cfg.fightingStyle && (
+            <div>
+              <SectionLabel>Fighting Style</SectionLabel>
+              <span className="text-xs bg-amber-900/25 border border-amber-700/30 text-amber-200/80 px-2.5 py-1 rounded-full">{cfg.fightingStyle}</span>
+            </div>
+          )}
+          {cfg.feats.length > 0 && (
+            <div>
+              <SectionLabel>Feats</SectionLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {cfg.feats.map(f => (
+                  <span key={f} className="text-xs bg-violet-900/30 border border-violet-800/30 text-violet-200/80 px-2.5 py-1 rounded-full">{f}</span>
                 ))}
               </div>
             </div>

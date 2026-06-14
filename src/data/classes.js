@@ -11,8 +11,12 @@ import warlockSpells from './warlock-spells.json'
 import paladinSpells from './paladin-spells.json'
 import rangerSpells from './ranger-spells.json'
 import subclassesData from './subclasses.json'
+import fightingStylesData from './fighting-styles.json'
 
 export const DEFAULT_CLASS = 'sorcerer'
+
+// Classes that choose a Fighting Style, and at what level
+const FIGHTING_STYLE_LEVEL = { fighter: 1, paladin: 2, ranger: 2 }
 
 // Annabelle's Lunar Sorcery isn't in the 2014 PHB subclass data, so inject it
 // as a sorcerer option. Picking it lights up the lunar-phase UI on the sheet.
@@ -323,7 +327,7 @@ export const CLASSES = {
       { level: 1, name: 'Lay on Hands',      description: 'A pool of healing equal to 5 × your level. Restore HP or cure a disease/poison as an action.' },
       { level: 2, name: 'Spellcasting',      description: 'CHA-based divine magic — prepare spells from the paladin list (floor(level/2) + CHA mod).' },
       { level: 2, name: 'Divine Smite',      description: 'On a melee hit, expend a spell slot to deal +2d8 radiant (+1d8 per slot level above 1st, +1d8 vs undead/fiends).' },
-      { level: 2, name: 'Fighting Style',    description: 'Choose a fighting style (track it in your notes for now).' },
+      { level: 2, name: 'Fighting Style',    description: 'Choose a fighting style — pick it in creation or the Builder; your choice shows above.' },
       { level: 3, name: 'Divine Health',     description: 'You are immune to disease.' },
       { level: 6, name: 'Aura of Protection', description: 'You and allies within 10 ft add your CHA mod to saving throws.' },
     ],
@@ -365,7 +369,7 @@ export const CLASSES = {
       { level: 1, name: "Favored Enemy",     description: 'You have significant experience with a type of enemy — advantage on tracking and recalling lore about them.' },
       { level: 1, name: 'Natural Explorer',  description: 'You are a master of a favored terrain — difficult terrain doesn\'t slow your group, you can\'t get lost by magic, and more.' },
       { level: 2, name: 'Spellcasting',      description: 'WIS-based primal magic — you know a fixed set of ranger spells.' },
-      { level: 2, name: 'Fighting Style',    description: 'Choose Archery, Defense, Dueling, or Two-Weapon Fighting (track it in your notes for now).' },
+      { level: 2, name: 'Fighting Style',    description: 'Choose Archery, Defense, Dueling, or Two-Weapon Fighting — pick it in creation or the Builder; your choice shows above.' },
       { level: 3, name: 'Primeval Awareness', description: 'Expend a spell slot to sense favored enemies within 1 mile (6 with a favored terrain).' },
       { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action.' },
     ],
@@ -439,7 +443,7 @@ export const CLASSES = {
     blurb: 'A master of weapons and armor. Versatile, durable, and unmatched in sustained combat — the backbone of any front line.',
     proficiencies: 'All armor, shields. Simple and martial weapons.',
     features: [
-      { level: 1, name: 'Fighting Style',    description: 'Choose a fighting style — Archery, Defense, Dueling, Great Weapon, Protection, or Two-Weapon (track it in your notes for now).' },
+      { level: 1, name: 'Fighting Style',    description: 'Choose a fighting style (Archery, Defense, Dueling, Great Weapon, Protection, or Two-Weapon) — pick it in creation or the Builder; your choice shows above.' },
       { level: 1, name: 'Second Wind',       description: 'Bonus action: regain 1d10 + fighter level HP. Once per short or long rest.' },
       { level: 2, name: 'Action Surge',      description: 'Take one additional action on your turn. Once per short or long rest (twice at 17th).' },
       { level: 5, name: 'Extra Attack',      description: 'Attack twice whenever you take the Attack action (three times at 11th, four at 20th).' },
@@ -721,6 +725,19 @@ export function getSubclassFeatures(classId, shortName, level) {
 // Lunar sorcerers get the moon-phase UI + always-prepared bonus spells.
 export function isLunarSorcerer(classId, shortName) {
   return classId === 'sorcerer' && shortName === 'Lunar'
+}
+
+// ── Fighting styles ──────────────────────────────────────────────────────────
+// { level, options:[{ name, description, classes }] } or null if class doesn't get one
+export function getFightingStyleInfo(classId) {
+  const level = FIGHTING_STYLE_LEVEL[classId]
+  if (!level) return null
+  return { level, options: fightingStylesData.styles.filter(s => s.classes.includes(classId)) }
+}
+
+export function getFightingStyle(classId, name) {
+  if (!name) return null
+  return fightingStylesData.styles.find(s => s.name === name && s.classes.includes(classId)) || null
 }
 
 // AC for a freshly created character of this class
